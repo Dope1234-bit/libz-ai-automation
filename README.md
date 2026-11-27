@@ -7,7 +7,7 @@ conversations, voice interaction, long-term memory, smart automation, and integr
 business management capabilities. Built to become a powerful, secure, and extensible
 AI operating assistant.
 
-> **Status:** Phase 1. Foundations, auth and workspaces, the multi-provider AI router with streaming chat, and the first version of the web app (sign-in and chat) are complete.
+> **Status:** Phase 1 complete — command centre (Personal/Business modes), streaming multi-provider AI chat, memory, browser voice, settings, team invites and audit activity. Deployed on Vercel + Supabase.
 
 ## Repository layout
 

@@ -6,7 +6,23 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ConversationSummary, Message } from "@/lib/api";
 import { api, ApiError, sendMessage } from "@/lib/api";
 import { useWorkspace } from "@/lib/workspace-context";
-import { BookmarkIcon, CloseIcon, HistoryIcon, PlusIcon, SendIcon, StopIcon } from "../icons";
+import {
+  readAloudPreference,
+  setReadAloudPreference,
+  speak,
+  speechOutputSupported,
+  stopSpeaking,
+} from "@/lib/voice";
+import {
+  BookmarkIcon,
+  CloseIcon,
+  HistoryIcon,
+  PlusIcon,
+  SendIcon,
+  SpeakerIcon,
+  StopIcon,
+} from "../icons";
+import { MicButton } from "../MicButton";
 import { RememberDialog } from "../memory/RememberDialog";
 import { Markdown } from "../Markdown";
 
@@ -25,6 +41,17 @@ export function ChatView({ conversationId }: { conversationId: string | null }) 
   const [historyOpen, setHistoryOpen] = useState(false);
   const [remembering, setRemembering] = useState<UiMessage | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [canSpeak, setCanSpeak] = useState(false);
+  const [readAloud, setReadAloud] = useState(false);
+  const readAloudRef = useRef(false);
+
+  useEffect(() => {
+    setCanSpeak(speechOutputSupported());
+    const pref = readAloudPreference();
+    setReadAloud(pref);
+    readAloudRef.current = pref;
+    return () => stopSpeaking();
+  }, []);
   const abortRef = useRef<AbortController | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
   const autoSent = useRef(false);
@@ -83,6 +110,7 @@ export function ChatView({ conversationId }: { conversationId: string | null }) 
       setError(null);
       setDraft("");
       setStreaming(true);
+      stopSpeaking();
 
       const controller = new AbortController();
       abortRef.current = controller;
@@ -112,6 +140,7 @@ export function ChatView({ conversationId }: { conversationId: string | null }) 
             reply += evt.data.text;
             update({ content: reply });
           } else if (evt.event === "done") {
+            if (readAloudRef.current && reply) speak(reply);
             update({
               status: evt.data.status === "partial" ? "partial" : "complete",
               id: evt.data.messageId ?? replyId,
@@ -208,6 +237,23 @@ export function ChatView({ conversationId }: { conversationId: string | null }) 
             <HistoryIcon />
           </button>
           <h1 className="chat-title">{title}</h1>
+          {canSpeak && (
+            <button
+              className={`btn btn-ghost icon-btn ${readAloud ? "is-on" : ""}`}
+              onClick={() => {
+                const next = !readAloud;
+                setReadAloud(next);
+                readAloudRef.current = next;
+                setReadAloudPreference(next);
+                if (!next) stopSpeaking();
+              }}
+              aria-label={readAloud ? "Stop reading replies aloud" : "Read replies aloud"}
+              aria-pressed={readAloud}
+              title={readAloud ? "Reading replies aloud" : "Read replies aloud"}
+            >
+              <SpeakerIcon />
+            </button>
+          )}
           <Link
             href="/app/chat"
             className="btn btn-ghost icon-btn"
@@ -298,6 +344,7 @@ export function ChatView({ conversationId }: { conversationId: string | null }) 
             disabled={!canChat}
             aria-label="Message"
           />
+          <MicButton onText={setDraft} onError={setError} disabled={!canChat || streaming} />
           {streaming ? (
             <button
               type="button"

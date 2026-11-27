@@ -7,6 +7,7 @@ import type { AuditEvent, ConversationSummary, Member, SystemStatus, Usage } fro
 import { api } from "@/lib/api";
 import { useWorkspace } from "@/lib/workspace-context";
 import { ArrowIcon, SendIcon } from "../icons";
+import { MicButton } from "../MicButton";
 
 function greeting(date: Date): string {
   const h = date.getHours();
@@ -119,6 +120,7 @@ export function CommandCentre() {
               maxLength={20_000}
               disabled={workspace?.role === "viewer"}
             />
+            <MicButton onText={setCommand} disabled={workspace?.role === "viewer"} />
             <button
               className="btn btn-primary icon-btn"
               disabled={!command.trim()}
@@ -196,14 +198,16 @@ export function CommandCentre() {
               {/* SVG attributes, not inline styles, so the strict CSP stays intact. */}
               <svg viewBox="0 0 36 36" aria-hidden="true">
                 <circle className="ring-track" cx="18" cy="18" r="15.915" />
-                <circle
-                  className="ring-value"
-                  cx="18"
-                  cy="18"
-                  r="15.915"
-                  strokeDasharray={`${pct} ${100 - pct}`}
-                  strokeDashoffset="25"
-                />
+                {pct > 0 && (
+                  <circle
+                    className="ring-value"
+                    cx="18"
+                    cy="18"
+                    r="15.915"
+                    strokeDasharray={`${pct} ${100 - pct}`}
+                    strokeDashoffset="25"
+                  />
+                )}
               </svg>
               <span>{pct}%</span>
             </div>
@@ -330,7 +334,8 @@ export function CommandCentre() {
             <span className="tag">Phase 2</span>
           </li>
           <li>
-            <span className="dot dot-idle" /> Voice <span className="tag">Next</span>
+            <span className="dot dot-ok" /> Voice input &amp; read-aloud (browser){" "}
+            <span className="tag tag-ok">Online</span>
           </li>
           <li>
             <span className="dot dot-idle" /> Tasks, calendar &amp; reminders{" "}

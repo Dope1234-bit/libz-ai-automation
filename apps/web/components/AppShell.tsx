@@ -8,7 +8,7 @@ import type { SystemStatus } from "@/lib/api";
 import { api } from "@/lib/api";
 import { getSupabase } from "@/lib/supabase/client";
 import { useWorkspace, WorkspaceProvider } from "@/lib/workspace-context";
-import { ChatIcon, CoreIcon, LogoutIcon, MemoryIcon } from "./icons";
+import { ActivityIcon, ChatIcon, CoreIcon, LogoutIcon, MemoryIcon, SettingsIcon } from "./icons";
 import { ModeSwitch } from "./ModeSwitch";
 
 /** Only sections that actually exist are listed; more are added as they ship. */
@@ -25,6 +25,18 @@ const NAV = [
     label: "Memory",
     icon: MemoryIcon,
     match: (p: string) => p.startsWith("/app/memory"),
+  },
+  {
+    href: "/app/activity",
+    label: "Activity",
+    icon: ActivityIcon,
+    match: (p: string) => p.startsWith("/app/activity"),
+  },
+  {
+    href: "/app/settings",
+    label: "Settings",
+    icon: SettingsIcon,
+    match: (p: string) => p.startsWith("/app/settings"),
   },
 ];
 

@@ -88,6 +88,16 @@ export interface Memory {
   updated_at: string;
 }
 
+export interface Invitation {
+  id: string;
+  email: string;
+  role: Workspace["role"];
+  expires_at: string;
+  accepted_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -162,6 +172,30 @@ export const api = {
   updateMemory: (id: string, body: Partial<Pick<Memory, "content" | "category" | "pinned">>) =>
     request<{ memory: Memory }>("PATCH", `/v1/memories/${id}`, body),
   deleteMemory: (id: string) => request<void>("DELETE", `/v1/memories/${id}`),
+  updateProfile: (body: { displayName?: string | null }) =>
+    request<{ displayName: string | null }>("PATCH", "/v1/me", body),
+  renameWorkspace: (id: string, name: string) =>
+    request<{ workspace: Workspace }>("PATCH", `/v1/workspaces/${id}`, { name }),
+  invitations: (workspaceId: string) =>
+    request<{ invitations: Invitation[] }>("GET", `/v1/workspaces/${workspaceId}/invitations`),
+  createInvitation: (workspaceId: string, email: string, role: "admin" | "member" | "viewer") =>
+    request<{ id: string; token: string; expiresAt: string }>(
+      "POST",
+      `/v1/workspaces/${workspaceId}/invitations`,
+      { email, role },
+    ),
+  revokeInvitation: (workspaceId: string, invitationId: string) =>
+    request<void>("DELETE", `/v1/workspaces/${workspaceId}/invitations/${invitationId}`),
+  setMemberRole: (workspaceId: string, userId: string, role: "admin" | "member" | "viewer") =>
+    request<{ userId: string; role: string }>(
+      "PATCH",
+      `/v1/workspaces/${workspaceId}/members/${userId}`,
+      { role },
+    ),
+  removeMember: (workspaceId: string, userId: string) =>
+    request<void>("DELETE", `/v1/workspaces/${workspaceId}/members/${userId}`),
+  acceptInvitation: (token: string) =>
+    request<{ workspaceId: string }>("POST", "/v1/invitations/accept", { token }),
   status: () => request<SystemStatus>("GET", "/v1/system/status"),
   usage: () => request<Usage>("GET", "/v1/me/usage"),
   members: (workspaceId: string) =>

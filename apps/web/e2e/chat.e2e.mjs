@@ -46,6 +46,25 @@ const watch = (page) => {
 
 try {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  // Deterministic stand-in for the browser's speech recognition service.
+  await ctx.addInitScript(() => {
+    class FakeRecognition {
+      start() {
+        setTimeout(() => {
+          this.onresult?.({
+            resultIndex: 0,
+            results: [{ isFinal: true, 0: { transcript: "What is on my agenda today" } }],
+          });
+          this.onend?.();
+        }, 50);
+      }
+      stop() {
+        this.onend?.();
+      }
+      abort() {}
+    }
+    window.SpeechRecognition = FakeRecognition;
+  });
   const page = await ctx.newPage();
   watch(page);
 
@@ -117,13 +136,54 @@ try {
   await page.getByText("No memories yet.", { exact: false }).waitFor();
   await page.getByRole("link", { name: "Command" }).first().click();
 
+  // Settings (Business): invite a teammate with a one-time link.
+  await page.getByRole("link", { name: "Settings" }).first().click();
+  await page.waitForURL(/\/app\/settings$/);
+  await page.getByText("Workspace · Business").waitFor();
+  await page.getByRole("textbox", { name: "Email" }).fill("teammate@example.com");
+  await page.getByRole("button", { name: "Create invite" }).click();
+  const link = await page.getByLabel("Invitation link").inputValue();
+  assert.match(link, /\/app\/invite\?token=[0-9a-f]{64}$/, "one-time invitation link");
+  await page.getByText("teammate@example.com").waitFor(); // pending invitation
+  await page.getByText("Google Calendar").waitFor();
+  assert.ok(
+    (await page.getByText("Not connected").count()) >= 6,
+    "integrations are honestly listed",
+  );
+
+  // Activity shows the real audit trail.
+  await page.getByRole("link", { name: "Activity" }).first().click();
+  await page.getByText("Invitation created").waitFor();
+  await page.getByText("Workspace created").first().waitFor();
+
   // Back to Personal: the personal conversation is there again.
+  await page.getByRole("link", { name: "Command" }).first().click();
+  await page.waitForURL(/\/app$/);
   await page.getByRole("radio", { name: "Personal" }).click();
   await page.getByText("Personal mode · Personal").waitFor();
   await page
     .getByRole("link", { name: /First message/ })
     .first()
     .waitFor();
+
+  // Profile rename is reflected in the greeting.
+  await page.getByRole("link", { name: "Settings" }).first().click();
+  await page.getByLabel("Your name").fill("Tester Renamed");
+  await page.getByRole("button", { name: "Save profile" }).click();
+  await page.getByText("Profile updated.").waitFor();
+  await page.getByRole("link", { name: "Command" }).first().click();
+  await page.getByRole("heading", { level: 1, name: /Tester/ }).waitFor();
+
+  // Voice: dictation fills the command bar; read-aloud can be toggled in chat.
+  await page.getByRole("button", { name: "Speak to Jarvis" }).click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('input[aria-label="Ask Jarvis"]')?.value ===
+      "What is on my agenda today",
+  );
+  await page.getByRole("link", { name: "Chat" }).first().click();
+  await page.getByRole("button", { name: "Read replies aloud" }).click();
+  await page.getByRole("button", { name: "Stop reading replies aloud" }).waitFor();
 
   // Mobile layout: bottom tabs, history sheet, no horizontal scroll.
   const mobile = await browser.newContext({
