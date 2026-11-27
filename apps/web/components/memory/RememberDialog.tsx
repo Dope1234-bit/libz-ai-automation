@@ -51,7 +51,7 @@ export function RememberDialog({
       >
         <p className="eyebrow">Memory</p>
         <h2 id="remember-title">Remember this</h2>
-        <p className="muted small">Edit it into a short note Jarvis should always know here.</p>
+        <p className="muted small">Edit it into a short note Sir Libz should always know here.</p>
         <label>
           Note
           <textarea

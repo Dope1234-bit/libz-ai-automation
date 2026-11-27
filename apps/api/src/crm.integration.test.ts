@@ -23,7 +23,7 @@ const env = loadEnv({ SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY: PUBLISHABLE_KEY, N
 const run = randomUUID().slice(0, 8);
 const userIds: string[] = [];
 
-/** Records the system prompt Jarvis was given. */
+/** Records the system prompt Sir Libz was given. */
 const seenPrompts: ChatMessage[][] = [];
 const recorder: ModelProvider = {
   id: "recorder",

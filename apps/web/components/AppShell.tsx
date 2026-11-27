@@ -168,8 +168,8 @@ function Shell({ children }: { children: ReactNode }) {
         <Link href="/app" className="brand">
           <span className="brand-mark" aria-hidden="true" />
           <span className="brand-text">
-            JARVIS
-            <small>Libz AI Automation</small>
+            SIR LIBZ
+            <small>Libz Enterprises Manager</small>
           </span>
         </Link>
         <nav className="rail-nav">
@@ -199,9 +199,9 @@ function Shell({ children }: { children: ReactNode }) {
 
       <div className="main">
         <header className="topbar">
-          <Link href="/app" className="brand brand-compact" aria-label="JARVIS home">
+          <Link href="/app" className="brand brand-compact" aria-label="SIR LIBZ home">
             <span className="brand-mark" aria-hidden="true" />
-            <span className="brand-text">JARVIS</span>
+            <span className="brand-text">SIR LIBZ</span>
           </Link>
           <ModeSwitch />
           <div

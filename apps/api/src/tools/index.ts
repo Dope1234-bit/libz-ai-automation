@@ -5,8 +5,8 @@ import { unwrap } from "../db.js";
 import { workspaceSummary } from "../lib/reports.js";
 
 /**
- * Jarvis's workspace tools. Every query runs through the caller's own Supabase
- * client, so row-level security limits Jarvis to exactly what the user can
+ * Sir Libz's workspace tools. Every query runs through the caller's own Supabase
+ * client, so row-level security limits Sir Libz to exactly what the user can
  * see. Read tools return real rows only; "propose_" tools never write business
  * records — they store a proposal the user must confirm.
  */

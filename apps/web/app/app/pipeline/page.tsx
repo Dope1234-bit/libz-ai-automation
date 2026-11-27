@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { PipelineView } from "@/components/crm/PipelineView";
 
-export const metadata: Metadata = { title: "Pipeline · Jarvis" };
+export const metadata: Metadata = { title: "Pipeline · Sir Libz" };
 
 export default function Page() {
   return <PipelineView />;

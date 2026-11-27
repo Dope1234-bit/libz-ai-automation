@@ -156,7 +156,7 @@ describe("streaming chat", () => {
     const conversationId = await startConversation(app, alice);
 
     const res = await call(app, alice, "POST", `/v1/conversations/${conversationId}/messages`, {
-      content: "Hi Jarvis",
+      content: "Hi Sir Libz",
     });
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("text/event-stream");
@@ -175,20 +175,20 @@ describe("streaming chat", () => {
       data: { status: "complete", usage: { inputTokens: 40, outputTokens: 10, estimated: false } },
     });
 
-    // The model received Jarvis's system prompt with the user's name, then the message.
+    // The model received Sir Libz's system prompt with the user's name, then the message.
     const sent = model.received[0]!;
     expect(sent[0]?.role).toBe("system");
     expect(sent[0]?.content).toContain('"alice"');
-    expect(sent.at(-1)).toEqual({ role: "user", content: "Hi Jarvis" });
+    expect(sent.at(-1)).toEqual({ role: "user", content: "Hi Sir Libz" });
 
     const stored = await call(app, alice, "GET", `/v1/conversations/${conversationId}`);
     const body = (await stored.json()) as {
       conversation: { title: string };
       messages: { role: string; content: string; status: string; provider: string | null }[];
     };
-    expect(body.conversation.title).toBe("Hi Jarvis");
+    expect(body.conversation.title).toBe("Hi Sir Libz");
     expect(body.messages).toEqual([
-      expect.objectContaining({ role: "user", content: "Hi Jarvis" }),
+      expect.objectContaining({ role: "user", content: "Hi Sir Libz" }),
       expect.objectContaining({
         role: "assistant",
         content: "Hello Alice, how can I help?",

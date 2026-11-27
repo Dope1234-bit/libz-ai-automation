@@ -98,7 +98,7 @@ export interface Invitation {
   created_at: string;
 }
 
-/** A change Jarvis suggested; nothing is saved until the user confirms. */
+/** A change Sir Libz suggested; nothing is saved until the user confirms. */
 export interface Proposal {
   id: string;
   kind: "task" | "activity_note";

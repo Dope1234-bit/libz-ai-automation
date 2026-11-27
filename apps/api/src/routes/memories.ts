@@ -44,7 +44,7 @@ const updateSchema = z
 const notFound = () => new AppError(ErrorCode.NotFound, "Memory not found.");
 
 /**
- * Memories: notes a user saves for Jarvis, private to them and scoped to one
+ * Memories: notes a user saves for Sir Libz, private to them and scoped to one
  * workspace. Row-level security enforces ownership and membership.
  */
 export const memoryRoutes = new Hono<AppEnv>()

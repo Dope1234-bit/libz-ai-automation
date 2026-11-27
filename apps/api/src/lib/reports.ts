@@ -4,7 +4,7 @@ import { unwrap } from "../db.js";
 
 /**
  * Real aggregates for one workspace, computed under the caller's row-level
- * security. Shared by the reports endpoint and Jarvis's pipeline tool so both
+ * security. Shared by the reports endpoint and Sir Libz's pipeline tool so both
  * always report the same numbers.
  */
 export async function workspaceSummary(db: SupabaseClient, workspaceId: string) {

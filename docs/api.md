@@ -1,4 +1,4 @@
-# Jarvis API (v1)
+# Sir Libz API (v1)
 
 Base URL (local): `http://localhost:4000`
 
@@ -112,9 +112,9 @@ won/lost this month, open/overdue/due-today tasks, company and contact counts, a
 activities in the last 7 days. Revenue is derived from won deals only
 (`revenueBasis: "won_deals"`).
 
-## Jarvis tools and proposals
+## Sir Libz tools and proposals
 
-During a chat reply Jarvis may call workspace tools. They run on the server with
+During a chat reply Sir Libz may call workspace tools. They run on the server with
 the user's own database session, so row-level security limits them to what the
 user can see. Business workspaces get `search_clients`, `get_client`,
 `pipeline_summary`, `list_deals`, `list_tasks`, `recent_activities`,

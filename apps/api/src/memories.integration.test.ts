@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- tests read arbitrary JSON responses */
 /**
  * Memory end-to-end tests against a real Supabase stack: CRUD, privacy,
- * Personal/Business isolation, and that Jarvis actually receives the memories.
+ * Personal/Business isolation, and that Sir Libz actually receives the memories.
  */
 import { randomUUID } from "node:crypto";
 import type { ChatMessage, ModelProvider } from "@jarvis/ai";
@@ -23,7 +23,7 @@ const env = loadEnv({ SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY: PUBLISHABLE_KEY, N
 const run = randomUUID().slice(0, 8);
 const userIds: string[] = [];
 
-/** Records the system prompt Jarvis was given. */
+/** Records the system prompt Sir Libz was given. */
 const seenPrompts: ChatMessage[][] = [];
 const recorder: ModelProvider = {
   id: "recorder",
@@ -158,7 +158,7 @@ describe("memories", () => {
     ).toBe(403);
   });
 
-  it("gives Jarvis only the current workspace's memories", async () => {
+  it("gives Sir Libz only the current workspace's memories", async () => {
     await call(owner, "POST", `/v1/workspaces/${business}/memories`, {
       content: "Our main client is Acme Corp",
       category: "fact",

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ChatView } from "@/components/chat/ChatView";
 
-export const metadata: Metadata = { title: "Chat · Jarvis" };
+export const metadata: Metadata = { title: "Chat · Sir Libz" };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

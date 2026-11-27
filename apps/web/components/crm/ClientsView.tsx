@@ -288,7 +288,7 @@ function ImportContacts({ workspaceId, onClose }: { workspaceId: string; onClose
             optionally <code>company</code>, <code>phone</code>, <code>email</code>,{" "}
             <code>role</code>, <code>notes</code>. Numbers are converted to international format
             (Zimbabwe by default); duplicates are skipped. Imported contacts are marked “consent
-            unknown”, so Jarvis will not treat them as opted in to marketing.
+            unknown”, so Sir Libz will not treat them as opted in to marketing.
           </p>
           <label>
             CSV file

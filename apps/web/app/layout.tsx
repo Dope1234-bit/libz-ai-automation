@@ -4,8 +4,8 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Jarvis",
-  description: "Your personal and business AI assistant by Libz AI Automation.",
+  title: "Sir Libz",
+  description: "Sir Libz, the Libz Enterprises manager: your business and personal AI assistant.",
 };
 
 export const viewport: Viewport = {

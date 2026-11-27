@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { ChatView } from "@/components/chat/ChatView";
 
-export const metadata: Metadata = { title: "Chat · Jarvis" };
+export const metadata: Metadata = { title: "Chat · Sir Libz" };
 
 export default function ChatPage() {
   return (

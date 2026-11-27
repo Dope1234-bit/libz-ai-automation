@@ -66,7 +66,7 @@ function CreateBusinessDialog({
   onClose: () => void;
   onCreate: (name: string) => Promise<void>;
 }) {
-  const [name, setName] = useState("Libz AI Automation");
+  const [name, setName] = useState("Libz Enterprises");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

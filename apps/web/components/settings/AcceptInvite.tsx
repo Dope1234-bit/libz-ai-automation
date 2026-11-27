@@ -23,7 +23,7 @@ export function AcceptInvite() {
         {valid ? (
           <>
             <p className="muted">
-              You’ve been invited to a Jarvis business workspace. It only works for the email
+              You’ve been invited to a Sir Libz business workspace. It only works for the email
               address it was sent to.
             </p>
             {error && (

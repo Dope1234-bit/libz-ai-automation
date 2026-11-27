@@ -41,7 +41,7 @@ type UiMessage = Pick<Message, "id" | "role" | "content" | "status"> & {
   proposals?: Proposal[];
 };
 
-/** What Jarvis is doing while a tool runs (labels for finished tools come from the API). */
+/** What Sir Libz is doing while a tool runs (labels for finished tools come from the API). */
 const RUNNING_LABELS: Record<string, string> = {
   search_clients: "Searching clients…",
   get_client: "Reading the client record…",
@@ -335,7 +335,7 @@ export function ChatView({ conversationId }: { conversationId: string | null }) 
               className={`msg msg-${m.role} ${m.status === "error" ? "msg-error" : ""}`}
             >
               {m.tools && m.tools.length > 0 && (
-                <ul className="tool-trail" aria-label="What Jarvis checked">
+                <ul className="tool-trail" aria-label="What Sir Libz checked">
                   {m.tools.map((t) => (
                     <li key={t.id} className={t.status === "running" ? "is-running" : ""}>
                       {t.status === "running"
@@ -350,7 +350,7 @@ export function ChatView({ conversationId }: { conversationId: string | null }) 
                   m.content ? (
                     <Markdown>{m.content}</Markdown>
                   ) : m.status === "partial" ? (
-                    <span className="typing" aria-label="Jarvis is thinking" />
+                    <span className="typing" aria-label="Sir Libz is thinking" />
                   ) : (
                     <span className="muted">No reply.</span>
                   )
@@ -423,7 +423,7 @@ export function ChatView({ conversationId }: { conversationId: string | null }) 
                 void send();
               }
             }}
-            placeholder={canChat ? "Message Jarvis…" : "Viewers can't chat in this workspace"}
+            placeholder={canChat ? "Message Sir Libz…" : "Viewers can't chat in this workspace"}
             rows={1}
             maxLength={20_000}
             disabled={!canChat}
@@ -463,7 +463,7 @@ export function ChatView({ conversationId }: { conversationId: string | null }) 
           onClose={() => setRemembering(null)}
           onSaved={() => {
             setRemembering(null);
-            setNotice("Saved to memory. Jarvis will use it in this workspace.");
+            setNotice("Saved to memory. Sir Libz will use it in this workspace.");
             setTimeout(() => setNotice(null), 4000);
           }}
         />

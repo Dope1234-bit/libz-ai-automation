@@ -66,7 +66,7 @@ const scripted: ModelProvider = {
           }.`
         : "I've prepared that task. Please confirm it below; nothing is saved until you do.";
     } else {
-      reply = `You said: "${last?.content ?? ""}". I'm **Jarvis**, running on a scripted test model.`;
+      reply = `You said: "${last?.content ?? ""}". I'm **Sir Libz**, running on a scripted test model.`;
     }
     for (const word of reply.split(/(?<= )/)) {
       await new Promise((resolve) => setTimeout(resolve, 15));

@@ -1,5 +1,5 @@
 /**
- * Browser end-to-end test of the Jarvis command centre:
+ * Browser end-to-end test of the Sir Libz command centre:
  * sign-in, Command Centre (real data), command bar → streamed chat, Markdown,
  * history across reloads, Personal/Business mode isolation, mobile layout,
  * sign-out — with zero console errors (including CSP violations).
@@ -86,13 +86,13 @@ try {
   await page.getByText("No conversations in this workspace yet.").waitFor();
 
   // The command bar hands the prompt to a streamed chat.
-  await page.getByLabel("Ask Jarvis").fill("First message");
+  await page.getByLabel("Ask Sir Libz").fill("First message");
   await page.keyboard.press("Enter");
   await page.waitForURL(/\/app\/chat/);
   await page.getByText('You said: "First message"').waitFor({ timeout: 15_000 });
   // Markdown renders as formatting, never as raw asterisks.
-  await page.locator(".msg-assistant strong", { hasText: "Jarvis" }).first().waitFor();
-  assert.equal(await page.getByText("**Jarvis**").count(), 0, "markdown is rendered");
+  await page.locator(".msg-assistant strong", { hasText: "Sir Libz" }).first().waitFor();
+  assert.equal(await page.getByText("**Sir Libz**").count(), 0, "markdown is rendered");
 
   await page.getByLabel("Message", { exact: true }).fill("Second message");
   await page.getByRole("button", { name: "Send", exact: true }).click();
@@ -175,10 +175,10 @@ try {
   await page.getByRole("heading", { level: 1, name: /Tester/ }).waitFor();
 
   // Voice: dictation fills the command bar; read-aloud can be toggled in chat.
-  await page.getByRole("button", { name: "Speak to Jarvis" }).click();
+  await page.getByRole("button", { name: "Speak to Sir Libz" }).click();
   await page.waitForFunction(
     () =>
-      document.querySelector('input[aria-label="Ask Jarvis"]')?.value ===
+      document.querySelector('input[aria-label="Ask Sir Libz"]')?.value ===
       "What is on my agenda today",
   );
   await page.getByRole("link", { name: "Chat" }).first().click();

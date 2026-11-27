@@ -112,7 +112,7 @@ export function SettingsView() {
         )}
         <p className="muted small section-note">
           Provider keys are held on the server only and are never sent to your browser. Models are
-          tried in order; if one is busy, Jarvis falls back to the next.
+          tried in order; if one is busy, Sir Libz falls back to the next.
         </p>
       </section>
 
@@ -141,8 +141,8 @@ export function SettingsView() {
           ))}
         </ul>
         <p className="muted small section-note">
-          App integrations arrive in Phase 3, each with explicit permissions and approval before
-          Jarvis takes any action.
+          App integrations arrive in Phase 3, each with explicit permissions and approval before Sir
+          Libz takes any action.
         </p>
       </section>
 
@@ -168,7 +168,7 @@ export function SettingsView() {
           <button
             className="btn btn-secondary"
             onClick={async () => {
-              if (!window.confirm("Sign out of Jarvis on every device?")) return;
+              if (!window.confirm("Sign out of Sir Libz on every device?")) return;
               await getSupabase().auth.signOut({ scope: "global" });
               router.replace("/login");
               router.refresh();

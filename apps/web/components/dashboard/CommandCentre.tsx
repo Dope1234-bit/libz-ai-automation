@@ -44,9 +44,9 @@ const ACTION_LABELS: Record<string, string> = {
   "task.deleted": "Task deleted",
   "activity.created": "Activity logged",
   "activity.deleted": "Activity deleted",
-  "jarvis.proposal_created": "Jarvis suggested a change",
-  "jarvis.proposal_confirmed": "Jarvis suggestion confirmed",
-  "jarvis.proposal_dismissed": "Jarvis suggestion dismissed",
+  "jarvis.proposal_created": "Sir Libz suggested a change",
+  "jarvis.proposal_confirmed": "Sir Libz suggestion confirmed",
+  "jarvis.proposal_dismissed": "Sir Libz suggestion dismissed",
   "member.role_changed": "Member role changed",
   "member.removed": "Member removed",
   "member.left": "Member left",
@@ -133,8 +133,8 @@ export function CommandCentre() {
             <input
               value={command}
               onChange={(e) => setCommand(e.target.value)}
-              placeholder="Ask Jarvis anything…"
-              aria-label="Ask Jarvis"
+              placeholder="Ask Sir Libz anything…"
+              aria-label="Ask Sir Libz"
               maxLength={20_000}
               disabled={workspace?.role === "viewer"}
             />
@@ -142,7 +142,7 @@ export function CommandCentre() {
             <button
               className="btn btn-primary icon-btn"
               disabled={!command.trim()}
-              aria-label="Send to Jarvis"
+              aria-label="Send to Sir Libz"
             >
               <SendIcon />
             </button>
@@ -366,7 +366,7 @@ export function CommandCentre() {
             <span className="tag tag-ok">Online</span>
           </li>
           <li>
-            <span className="dot dot-idle" /> Jarvis reading your CRM{" "}
+            <span className="dot dot-idle" /> Sir Libz reading your CRM{" "}
             <span className="tag">Next</span>
           </li>
           <li>

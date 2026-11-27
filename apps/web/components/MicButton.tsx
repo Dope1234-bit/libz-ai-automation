@@ -28,7 +28,7 @@ export function MicButton({
       className={`btn icon-btn mic ${listening ? "mic-live" : "btn-secondary"}`}
       onClick={listening ? stop : start}
       disabled={disabled}
-      aria-label={listening ? "Stop listening" : "Speak to Jarvis"}
+      aria-label={listening ? "Stop listening" : "Speak to Sir Libz"}
       aria-pressed={listening}
       title="Voice input uses your browser's speech recognition, which may send audio to your browser's provider."
     >

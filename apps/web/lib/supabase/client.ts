@@ -6,7 +6,7 @@ import { config } from "../config";
 
 let client: SupabaseClient | undefined;
 
-/** Browser Supabase client (auth only; data goes through the Jarvis API). */
+/** Browser Supabase client (auth only; data goes through the Sir Libz API). */
 export function getSupabase(): SupabaseClient {
   client ??= createBrowserClient(config.supabaseUrl, config.supabaseKey);
   return client;

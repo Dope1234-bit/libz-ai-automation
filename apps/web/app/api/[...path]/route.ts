@@ -1,7 +1,7 @@
 import { createApp, loadEnv } from "@jarvis/api";
 
 /**
- * Serves the Jarvis API from the web app under /api (e.g. /api/v1/me), so a
+ * Serves the Sir Libz API from the web app under /api (e.g. /api/v1/me), so a
  * single deployment hosts both on one origin. The API itself is unchanged; this
  * only strips the /api prefix. Created lazily so builds need no server config.
  */

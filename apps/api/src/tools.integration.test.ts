@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- tests read arbitrary JSON responses */
 /**
- * Jarvis tool use end-to-end against a real Supabase stack: tools read real
+ * Sir Libz tool use end-to-end against a real Supabase stack: tools read real
  * rows under the user's RLS, results reach the model, proposals need explicit
  * confirmation, and the tool loop always terminates.
  */
@@ -163,7 +163,7 @@ async function conversation(user: User, workspaceId: string) {
     .conversation.id as string;
 }
 
-describe("Jarvis tools", () => {
+describe("Sir Libz tools", () => {
   it("offers CRM tools in business workspaces and only task tools in personal ones", async () => {
     requests.length = 0;
     await chat(owner, await conversation(owner, ws), "hello");

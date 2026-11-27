@@ -48,7 +48,7 @@ export function speechOutputSupported(): boolean {
 
 const ERRORS: Record<string, string> = {
   "not-allowed":
-    "Microphone access was blocked. Allow it in your browser settings to talk to Jarvis.",
+    "Microphone access was blocked. Allow it in your browser settings to talk to Sir Libz.",
   "service-not-allowed": "Speech recognition is not available in this browser.",
   "no-speech": "I didn't hear anything. Tap the mic and try again.",
   network: "Speech recognition needs an internet connection.",

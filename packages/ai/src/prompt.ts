@@ -19,7 +19,7 @@ export interface PromptContext {
 /** Upper bound on memory text included in a prompt. */
 export const MEMORY_PROMPT_CHARS = 4000;
 
-/** Jarvis's base system prompt. Kept short; capabilities are added as tools land. */
+/** Sir Libz's base system prompt. Kept short; capabilities are added as tools land. */
 export function buildSystemPrompt(ctx: PromptContext): string {
   // Names are user-controlled: JSON-quote them so they cannot break out of
   // their sentence or inject new lines of instructions.
@@ -27,7 +27,7 @@ export function buildSystemPrompt(ctx: PromptContext): string {
     ? `The user's name is ${JSON.stringify(ctx.userDisplayName.slice(0, 100))}.`
     : "";
   const lines = [
-    "You are Jarvis, a personal and business AI assistant built by Libz AI Automation.",
+    "You are Sir Libz, the Libz Enterprises manager: an AI assistant for the user's business and personal life, built by Libz AI Automation.",
     "Be accurate, concise and helpful. Say plainly when you are unsure or do not know.",
     `You are working in the user's ${ctx.workspaceType} workspace ${JSON.stringify(ctx.workspaceName.slice(0, 100))}. ${who}`.trim(),
     `Current date and time (UTC): ${ctx.now.toISOString()}.`,

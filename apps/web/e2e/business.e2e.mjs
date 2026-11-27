@@ -130,7 +130,7 @@ try {
   // Overdue badge on Tasks reflects the real overdue task.
   await rail.getByRole("link", { name: /Tasks/ }).getByText("1").waitFor();
 
-  // Jarvis answers from real records via tools, and proposes changes for confirmation.
+  // Sir Libz answers from real records via tools, and proposes changes for confirmation.
   await rail.getByRole("link", { name: "Chat" }).click();
   await page.getByLabel("Message", { exact: true }).fill("What's in my pipeline?");
   await page.getByRole("button", { name: "Send", exact: true }).click();
@@ -196,7 +196,7 @@ try {
   await rail.getByRole("link", { name: /Tasks/ }).click();
   await page.getByRole("button", { name: "Complete “Send proposal to Moyo”" }).click();
   await page.locator(".rail .nav-badge").waitFor({ state: "detached" });
-  // The task Jarvis proposed exists only because it was confirmed.
+  // The task Sir Libz proposed exists only because it was confirmed.
   await page.getByText("call Tendai about the quote").waitFor();
 
   // Phone layout.

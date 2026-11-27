@@ -10,7 +10,7 @@ import { CheckIcon, CloseIcon } from "../icons";
 const str = (v: unknown) => (typeof v === "string" && v.trim() ? v : null);
 
 /**
- * A change Jarvis suggested. Nothing is saved until the user taps Confirm;
+ * A change Sir Libz suggested. Nothing is saved until the user taps Confirm;
  * the server re-checks permissions and records the decision in the audit log.
  */
 export function ProposalCard({

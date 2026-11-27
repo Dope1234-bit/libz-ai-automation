@@ -58,8 +58,8 @@ function LoginForm() {
   return (
     <main className="auth">
       <form className="auth-card" onSubmit={submit} aria-labelledby="auth-title">
-        <p className="eyebrow">Libz AI Automation</p>
-        <h1 id="auth-title">{mode === "signin" ? "Sign in to Jarvis" : "Create your account"}</h1>
+        <p className="eyebrow">Libz Enterprises Manager</p>
+        <h1 id="auth-title">{mode === "signin" ? "Sign in to Sir Libz" : "Create your account"}</h1>
 
         {mode === "signup" && (
           <label>

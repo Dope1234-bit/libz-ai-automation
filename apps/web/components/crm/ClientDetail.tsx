@@ -431,7 +431,7 @@ function ActivityForm({
         }}
       >
         <p className="muted small">
-          This records what already happened. Jarvis does not send messages or place calls.
+          This records what already happened. Sir Libz does not send messages or place calls.
         </p>
         <div className="form-grid">
           <label>

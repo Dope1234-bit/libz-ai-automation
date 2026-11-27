@@ -66,7 +66,7 @@ export function MemoryView() {
   }
 
   async function remove(m: Memory) {
-    if (!window.confirm("Delete this memory? Jarvis will no longer use it.")) return;
+    if (!window.confirm("Delete this memory? Sir Libz will no longer use it.")) return;
     try {
       await api.deleteMemory(m.id);
       await load();
@@ -83,7 +83,7 @@ export function MemoryView() {
         <p className="eyebrow">Brain · {workspace?.name ?? "…"}</p>
         <h1>Memory</h1>
         <p className="muted">
-          Things Jarvis should always know in this workspace. Only you can see your memories, and
+          Things Sir Libz should always know in this workspace. Only you can see your memories, and
           {workspace?.type === "business"
             ? " business memories never appear in Personal mode."
             : " personal memories never appear in Business mode."}{" "}

@@ -7,7 +7,7 @@ import { useWorkspace } from "@/lib/workspace-context";
 /** CRM screens exist only in Business mode (the database enforces this too). */
 export function BusinessOnly({ title, children }: { title: string; children: ReactNode }) {
   const { mode, setMode, workspace, businessWorkspaces, createBusiness } = useWorkspace();
-  const [name, setName] = useState("Libz AI Automation");
+  const [name, setName] = useState("Libz Enterprises");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
