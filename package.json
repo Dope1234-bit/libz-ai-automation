@@ -22,7 +22,7 @@
     "db:start:full": "supabase start",
     "db:test": "supabase test db",
     "db:lint": "supabase db lint --level warning --fail-on warning",
-    "test:integration": "pnpm --filter @jarvis/api test:integration"
+    "test:integration": "turbo run test:integration"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
