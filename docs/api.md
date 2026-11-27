@@ -20,30 +20,32 @@ is not revealed.
 
 ## Endpoints
 
-| Method | Path                                           | Who                                 | Purpose                                              |
-| ------ | ---------------------------------------------- | ----------------------------------- | ---------------------------------------------------- |
-| GET    | `/health`                                      | anyone                              | Liveness                                             |
-| GET    | `/v1/me`                                       | user                                | Current user, profile, workspaces with roles         |
-| PATCH  | `/v1/me`                                       | user                                | Update `displayName`, `avatarUrl` (https only)       |
-| GET    | `/v1/workspaces`                               | user                                | Workspaces the user belongs to                       |
-| POST   | `/v1/workspaces`                               | user                                | Create a business workspace `{ name }`               |
-| GET    | `/v1/workspaces/:id`                           | member                              | Workspace details                                    |
-| PATCH  | `/v1/workspaces/:id`                           | admin+                              | Rename `{ name }`                                    |
-| DELETE | `/v1/workspaces/:id`                           | owner                               | Delete a business workspace                          |
-| GET    | `/v1/workspaces/:id/members`                   | member                              | Members with roles and profiles                      |
-| PATCH  | `/v1/workspaces/:id/members/:userId`           | admin+ (owner for admins)           | Change role `{ role: admin \| member \| viewer }`    |
-| DELETE | `/v1/workspaces/:id/members/:userId`           | self, or admin+ (owner for admins)  | Leave or remove a member (never the owner)           |
-| GET    | `/v1/workspaces/:id/invitations`               | admin+                              | List invitations                                     |
-| POST   | `/v1/workspaces/:id/invitations`               | admin+ (owner to invite admins)     | Invite `{ email, role }`; returns the token **once** |
-| DELETE | `/v1/workspaces/:id/invitations/:invitationId` | admin+                              | Revoke an open invitation                            |
-| POST   | `/v1/invitations/accept`                       | invitee (verified email must match) | Accept `{ token }`                                   |
-| GET    | `/v1/workspaces/:id/audit-logs?limit=50`       | admin+                              | Recent audit events (max 200)                        |
-| GET    | `/v1/workspaces/:id/conversations`             | member                              | Your conversations in the workspace (newest first)   |
-| POST   | `/v1/workspaces/:id/conversations`             | member+ (not viewers)               | Start a conversation `{ title? }`                    |
-| GET    | `/v1/conversations/:id`                        | its owner                           | Conversation with messages                           |
-| PATCH  | `/v1/conversations/:id`                        | its owner                           | Rename `{ title }`                                   |
-| DELETE | `/v1/conversations/:id`                        | its owner                           | Delete with all messages                             |
-| POST   | `/v1/conversations/:id/messages`               | its owner                           | Send `{ content }`; streams the reply (SSE, below)   |
+| Method | Path                                           | Who                                 | Purpose                                                                               |
+| ------ | ---------------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------- |
+| GET    | `/health`                                      | anyone                              | Liveness                                                                              |
+| GET    | `/v1/me`                                       | user                                | Current user, profile, workspaces with roles                                          |
+| PATCH  | `/v1/me`                                       | user                                | Update `displayName`, `avatarUrl` (https only)                                        |
+| GET    | `/v1/workspaces`                               | user                                | Workspaces the user belongs to                                                        |
+| POST   | `/v1/workspaces`                               | user                                | Create a business workspace `{ name }`                                                |
+| GET    | `/v1/workspaces/:id`                           | member                              | Workspace details                                                                     |
+| PATCH  | `/v1/workspaces/:id`                           | admin+                              | Rename `{ name }`                                                                     |
+| DELETE | `/v1/workspaces/:id`                           | owner                               | Delete a business workspace                                                           |
+| GET    | `/v1/workspaces/:id/members`                   | member                              | Members with roles and profiles                                                       |
+| PATCH  | `/v1/workspaces/:id/members/:userId`           | admin+ (owner for admins)           | Change role `{ role: admin \| member \| viewer }`                                     |
+| DELETE | `/v1/workspaces/:id/members/:userId`           | self, or admin+ (owner for admins)  | Leave or remove a member (never the owner)                                            |
+| GET    | `/v1/workspaces/:id/invitations`               | admin+                              | List invitations                                                                      |
+| POST   | `/v1/workspaces/:id/invitations`               | admin+ (owner to invite admins)     | Invite `{ email, role }`; returns the token **once**                                  |
+| DELETE | `/v1/workspaces/:id/invitations/:invitationId` | admin+                              | Revoke an open invitation                                                             |
+| POST   | `/v1/invitations/accept`                       | invitee (verified email must match) | Accept `{ token }`                                                                    |
+| GET    | `/v1/workspaces/:id/audit-logs?limit=50`       | admin+                              | Recent audit events (max 200)                                                         |
+| GET    | `/v1/workspaces/:id/conversations`             | member                              | Your conversations in the workspace (newest first)                                    |
+| POST   | `/v1/workspaces/:id/conversations`             | member+ (not viewers)               | Start a conversation `{ title? }`                                                     |
+| GET    | `/v1/conversations/:id`                        | its owner                           | Conversation with messages                                                            |
+| PATCH  | `/v1/conversations/:id`                        | its owner                           | Rename `{ title }`                                                                    |
+| DELETE | `/v1/conversations/:id`                        | its owner                           | Delete with all messages                                                              |
+| POST   | `/v1/conversations/:id/messages`               | its owner                           | Send `{ content }`; streams the reply (SSE, below)                                    |
+| GET    | `/v1/system/status`                            | user                                | API/database status, configured AI providers and models (never keys), your last reply |
+| GET    | `/v1/me/usage`                                 | user                                | Your AI tokens used today, the daily limit, and usage by model                        |
 
 ## Streaming chat
 

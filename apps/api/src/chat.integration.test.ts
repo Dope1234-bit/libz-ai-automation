@@ -282,6 +282,59 @@ describe("streaming chat", () => {
   });
 });
 
+/* eslint-disable @typescript-eslint/no-explicit-any -- tests read arbitrary JSON */
+describe("system status and usage", () => {
+  it("reports real configuration, last reply and today's usage", async () => {
+    const model = scriptedProvider("primary", "Status check.", {
+      inputTokens: 30,
+      outputTokens: 12,
+    });
+    const app = createApp(env, {
+      chat: chatSettings([model.provider], { dailyTokenLimit: 50_000 }),
+    });
+    const conversationId = await startConversation(app, alice);
+    await sseEvents(
+      await call(app, alice, "POST", `/v1/conversations/${conversationId}/messages`, {
+        content: "ping",
+      }),
+    );
+
+    const status = (await (await call(app, alice, "GET", "/v1/system/status")).json()) as Record<
+      string,
+      any
+    >;
+    expect(status.api.status).toBe("online");
+    expect(status.database.status).toBe("online");
+    expect(status.ai).toMatchObject({
+      status: "configured",
+      providers: [{ provider: "primary", models: ["primary-model"] }],
+      lastReply: { provider: "primary", model: "primary-model", status: "complete" },
+    });
+    expect(JSON.stringify(status)).not.toMatch(/api_?key|secret|AIza|sk-|Bearer/i);
+
+    const usage = (await (await call(app, alice, "GET", "/v1/me/usage")).json()) as Record<
+      string,
+      any
+    >;
+    expect(usage.dailyLimit).toBe(50_000);
+    expect(usage.usedToday).toBeGreaterThanOrEqual(42);
+    expect(usage.byModel).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ provider: "primary", model: "primary-model" }),
+      ]),
+    );
+  });
+
+  it("reports when no AI provider is configured", async () => {
+    const app = createApp(env, { chat: chatSettings([]) });
+    const status = (await (await call(app, bob, "GET", "/v1/system/status")).json()) as Record<
+      string,
+      any
+    >;
+    expect(status.ai.status).toBe("not_configured");
+  });
+});
+
 describe("privacy and limits", () => {
   it("keeps conversations private, even from other users", async () => {
     const model = scriptedProvider("primary", "Secret plan.");

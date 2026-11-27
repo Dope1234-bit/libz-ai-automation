@@ -12,13 +12,15 @@
     "test:e2e": "node e2e/chat.e2e.mjs"
   },
   "dependencies": {
+    "@jarvis/api": "workspace:*",
     "@jarvis/shared": "workspace:*",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.119.2",
     "next": "^16.4.6",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "@jarvis/api": "workspace:*"
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@jarvis/tsconfig": "workspace:*",

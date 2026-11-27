@@ -14,9 +14,11 @@ import type { Env } from "./env.js";
 import type { ChatSettings } from "./routes/conversations.js";
 import { conversationRoutes } from "./routes/conversations.js";
 import { meRoutes } from "./routes/me.js";
+import { systemRoutes } from "./routes/system.js";
 import { invitationRoutes, workspaceRoutes } from "./routes/workspaces.js";
 
-export const API_VERSION = "0.2.0";
+export { API_VERSION } from "./version.js";
+import { API_VERSION } from "./version.js";
 
 export interface AppDeps {
   verifyToken: TokenVerifier;
@@ -92,6 +94,7 @@ export function createApp(env: Env, deps: Partial<AppDeps> = {}) {
   v1.route("/workspaces", workspaceRoutes);
   v1.route("/invitations", invitationRoutes);
   v1.route("/", conversationRoutes(chat));
+  v1.route("/", systemRoutes(chat));
   app.route("/v1", v1);
 
   app.notFound((c) => {

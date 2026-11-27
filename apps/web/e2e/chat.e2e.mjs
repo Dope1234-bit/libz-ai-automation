@@ -1,6 +1,8 @@
 /**
- * Browser end-to-end test: sign in, chat (streamed), reload, mobile layout,
- * sign out — with zero console errors (including CSP violations).
+ * Browser end-to-end test of the Jarvis command centre:
+ * sign-in, Command Centre (real data), command bar → streamed chat, Markdown,
+ * history across reloads, Personal/Business mode isolation, mobile layout,
+ * sign-out — with zero console errors (including CSP violations).
  *
  * Needs: local Supabase (`pnpm db:start`), the test API (`pnpm --filter
  * @jarvis/api e2e:server`) and the built web app on :3000. Env:
@@ -37,52 +39,106 @@ const userId = (await created.json()).id;
 
 const browser = await chromium.launch();
 const problems = [];
+const watch = (page) => {
+  page.on("console", (m) => m.type() === "error" && problems.push(m.text()));
+  page.on("pageerror", (e) => problems.push(e.message));
+};
+
 try {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const page = await ctx.newPage();
-  page.on("console", (m) => m.type() === "error" && problems.push(m.text()));
-  page.on("pageerror", (e) => problems.push(e.message));
+  watch(page);
 
+  // Protected route redirects to login; a wrong password is rejected.
   await page.goto(`${WEB}/app`);
   await page.waitForURL(/\/login\?next=%2Fapp/);
-
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill("wrong-password");
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.getByRole("alert").waitFor();
 
+  // Sign in lands on the Command Centre with real system data.
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL(/\/app$/);
-  await page.getByText("How can I help, Tester?").waitFor();
+  await page.getByRole("heading", { level: 1, name: /Tester/ }).waitFor();
+  await page.getByText("Personal mode · Personal").waitFor();
+  await page.getByText("scripted", { exact: false }).first().waitFor(); // AI provider from /system/status
+  await page.getByText("No conversations in this workspace yet.").waitFor();
 
-  await page.getByLabel("Message").fill("First message");
+  // The command bar hands the prompt to a streamed chat.
+  await page.getByLabel("Ask Jarvis").fill("First message");
   await page.keyboard.press("Enter");
+  await page.waitForURL(/\/app\/chat/);
   await page.getByText('You said: "First message"').waitFor({ timeout: 15_000 });
-  await page.getByLabel("Message").fill("Second message");
-  await page.getByRole("button", { name: "Send" }).click();
-  await page.getByText('You said: "Second message"').waitFor({ timeout: 15_000 });
+  // Markdown renders as formatting, never as raw asterisks.
+  await page.locator(".msg-assistant strong", { hasText: "Jarvis" }).first().waitFor();
+  assert.equal(await page.getByText("**Jarvis**").count(), 0, "markdown is rendered");
 
+  await page.getByLabel("Message").fill("Second message");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await page.getByText('You said: "Second message"').waitFor({ timeout: 15_000 });
+  assert.match(page.url(), /\/app\/chat\/[0-9a-f-]{36}$/, "conversation URL");
+
+  // History persists across a reload.
   await page.reload();
-  await page.getByRole("button", { name: "First message" }).click();
   await page.getByText('You said: "Second message"').waitFor();
   assert.equal(await page.locator(".msg").count(), 4, "history persists across reloads");
+  await page.locator(".chat-history").getByRole("link", { name: "First message" }).waitFor();
 
+  // Business mode: create the workspace; personal history must not appear there.
+  await page.getByRole("link", { name: "Command" }).first().click();
+  await page.waitForURL(/\/app$/);
+  await page.getByRole("radio", { name: "Business" }).click();
+  await page.getByRole("dialog").getByLabel("Business name").fill("Acme Test Business");
+  await page.getByRole("button", { name: "Create workspace" }).click();
+  await page.getByText("Business mode · Acme Test Business").waitFor();
+  await page.getByText("No conversations in this workspace yet.").waitFor();
+  await page.getByText("Workspace created").waitFor(); // real audit event
+
+  // Back to Personal: the personal conversation is there again.
+  await page.getByRole("radio", { name: "Personal" }).click();
+  await page.getByText("Personal mode · Personal").waitFor();
+  await page
+    .getByRole("link", { name: /First message/ })
+    .first()
+    .waitFor();
+
+  // Mobile layout: bottom tabs, history sheet, no horizontal scroll.
   const mobile = await browser.newContext({
     ...devices["iPhone 13"],
     storageState: await ctx.storageState(),
   });
   const mp = await mobile.newPage();
-  mp.on("console", (m) => m.type() === "error" && problems.push(m.text()));
-  await mp.goto(`${WEB}/app`);
-  await mp.getByRole("button", { name: "Open menu" }).click();
-  await mp.getByRole("button", { name: "First message" }).waitFor();
+  watch(mp);
+  await mp.goto(`${WEB}/app/chat`);
+  await mp.locator(".tabbar").getByRole("link", { name: "Command" }).waitFor();
+  await mp.getByRole("button", { name: "Open history" }).click();
+  await mp.locator(".sheet").getByRole("link", { name: "First message" }).waitFor();
   assert.equal(
     await mp.evaluate(() => document.documentElement.scrollWidth > window.innerWidth),
     false,
     "no horizontal scroll on mobile",
   );
+  await mp.goto(`${WEB}/app`);
+  await mp.getByRole("heading", { level: 1, name: /Tester/ }).waitFor();
+  assert.equal(
+    await mp.evaluate(() => document.documentElement.scrollWidth > window.innerWidth),
+    false,
+    "no horizontal scroll on the mobile Command Centre",
+  );
+  // Panels must fit the screen (scroll containers can hide overflow from the check above).
+  assert.deepEqual(
+    await mp.evaluate(() =>
+      [...document.querySelectorAll(".panel")]
+        .filter((el) => el.getBoundingClientRect().right > window.innerWidth + 1)
+        .map((el) => el.className),
+    ),
+    [],
+    "every panel fits within the mobile viewport",
+  );
 
+  // Sign out re-protects /app.
   await page.getByRole("button", { name: "Sign out" }).click();
   await page.waitForURL(/\/login/);
   await page.goto(`${WEB}/app`);

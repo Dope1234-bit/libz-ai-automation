@@ -33,6 +33,40 @@ export interface Message {
   created_at: string;
 }
 
+export interface SystemStatus {
+  api: { version: string; status: "online" };
+  database: { status: "online" | "degraded" };
+  ai: {
+    status: "configured" | "not_configured";
+    providers: { provider: string; models: string[] }[];
+    lastReply: { provider: string | null; model: string | null; status: string; at: string } | null;
+  };
+  limits: { dailyTokenLimit: number; requestsPerMinute: number };
+}
+
+export interface Usage {
+  usedToday: number;
+  dailyLimit: number;
+  resetsAt: string;
+  byModel: { provider: string; model: string; tokens: number; replies: number }[];
+}
+
+export interface Member {
+  userId: string;
+  role: Workspace["role"];
+  joinedAt: string;
+  displayName: string | null;
+}
+
+export interface AuditEvent {
+  id: number;
+  actor_id: string | null;
+  action: string;
+  target_type: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -93,6 +127,15 @@ export const api = {
       `/v1/conversations/${id}`,
     ),
   deleteConversation: (id: string) => request<void>("DELETE", `/v1/conversations/${id}`),
+  status: () => request<SystemStatus>("GET", "/v1/system/status"),
+  usage: () => request<Usage>("GET", "/v1/me/usage"),
+  members: (workspaceId: string) =>
+    request<{ members: Member[] }>("GET", `/v1/workspaces/${workspaceId}/members`),
+  auditLogs: (workspaceId: string, limit = 8) =>
+    request<{ events: AuditEvent[] }>(
+      "GET",
+      `/v1/workspaces/${workspaceId}/audit-logs?limit=${limit}`,
+    ),
 };
 
 export type ChatStreamEvent =

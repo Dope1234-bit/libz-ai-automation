@@ -15,7 +15,7 @@ const scripted: ModelProvider = {
   id: "scripted",
   async *streamChat(model, request) {
     const last = request.messages.at(-1)?.content ?? "";
-    const reply = `You said: "${last}". I'm Jarvis, running on a scripted test model.`;
+    const reply = `You said: "${last}". I'm **Jarvis**, running on a scripted test model.`;
     yield { type: "start", provider: "scripted", model };
     for (const word of reply.split(/(?<= )/)) {
       await new Promise((resolve) => setTimeout(resolve, 15));
