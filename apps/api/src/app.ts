@@ -13,6 +13,8 @@ import { createUserDbFactory } from "./db.js";
 import type { Env } from "./env.js";
 import type { ChatSettings } from "./routes/conversations.js";
 import { conversationRoutes } from "./routes/conversations.js";
+import { businessRoutes } from "./routes/business.js";
+import { crmRoutes } from "./routes/crm.js";
 import { memoryRoutes } from "./routes/memories.js";
 import { meRoutes } from "./routes/me.js";
 import { systemRoutes } from "./routes/system.js";
@@ -97,6 +99,8 @@ export function createApp(env: Env, deps: Partial<AppDeps> = {}) {
   v1.route("/", conversationRoutes(chat));
   v1.route("/", systemRoutes(chat));
   v1.route("/", memoryRoutes);
+  v1.route("/", crmRoutes);
+  v1.route("/", businessRoutes);
   app.route("/v1", v1);
 
   app.notFound((c) => {

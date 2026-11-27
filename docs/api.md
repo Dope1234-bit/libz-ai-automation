@@ -69,6 +69,49 @@ configured). Conversations are private to their creator, even from workspace
 admins. If the client disconnects, the partial reply is saved with
 `status: "partial"`.
 
+## Business (CRM)
+
+Entities: `companies`, `contacts`, `deals`, `projects`, `tasks`, `activities`.
+Every entity has the same five routes:
+
+| Method   | Path                                   | Notes                                                        |
+| -------- | -------------------------------------- | ------------------------------------------------------------ |
+| `GET`    | `/v1/workspaces/:workspaceId/{entity}` | `{ items, total, limit, offset }`; `limit` ≤ 200, `q` search |
+| `POST`   | `/v1/workspaces/:workspaceId/{entity}` | camelCase body → `201 { item }`                              |
+| `GET`    | `/v1/{entity}/:id`                     | `{ item }`                                                   |
+| `PATCH`  | `/v1/{entity}/:id`                     | partial body → `{ item }`                                    |
+| `DELETE` | `/v1/{entity}/:id`                     | `204`; admins only (tasks: their author too)                 |
+
+List filters: `company_id`, `contact_id`, `deal_id`, `project_id` where relevant;
+`stage` (deals), `status` (projects, tasks), `type` (activities). Tasks also take
+`assignee=me` and `view=open|overdue|today`.
+
+- `phone` is normalised to E.164 (default country Zimbabwe, +263) and stored as
+  `phone_e164`; `email` is lowercased. Duplicates within a workspace → `409`.
+- Contacts carry `marketingConsent` (`unknown`/`granted`/`denied`); `granted`
+  requires `consentSource` and `consentAt`. `doNotContact` overrides everything.
+- Companies, contacts, deals, projects and activities exist only in **business**
+  workspaces; tasks work in personal workspaces too.
+- References (company, contact, deal, project, assignee, owner) must belong to the
+  same workspace.
+
+### `POST /v1/workspaces/:workspaceId/import/contacts`
+
+Body `{ csv, dryRun = true, defaultCountryCode = "263" }`. Import your own lists
+(≤ 2000 rows). Recognised headers: `name`/`full_name`, `email`, `phone`/`mobile`/
+`whatsapp`, `company`, `role`/`title`, `notes`. Rows with a missing name, invalid
+email or phone, or an email/phone already in the workspace (or earlier in the
+file) are skipped with a reason. Dry run returns `{ toCreate, newCompanies,
+skipped, preview }` and writes nothing. Imported contacts have consent `unknown`;
+importing is not permission to market to them.
+
+### `GET /v1/workspaces/:workspaceId/reports/summary`
+
+Real aggregates: pipeline count and value by stage (per currency), open pipeline,
+won/lost this month, open/overdue/due-today tasks, company and contact counts, and
+activities in the last 7 days. Revenue is derived from won deals only
+(`revenueBasis: "won_deals"`).
+
 ## Rules enforced in the database
 
 - Every user gets a **personal workspace** at sign-up; it cannot be deleted or
@@ -80,3 +123,5 @@ admins. If the client disconnects, the partial reply is saved with
   **verified** email address.
 - The **audit log** is append-only: rows cannot be updated or deleted, even by the
   database owner, and survive deletion of the workspace or user they describe.
+- Business records are audited (created, deleted, deal stage changes, task
+  completion) without copying their content into the audit log.
