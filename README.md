@@ -7,7 +7,7 @@ conversations, voice interaction, long-term memory, smart automation, and integr
 business management capabilities. Built to become a powerful, secure, and extensible
 AI operating assistant.
 
-> **Status:** Phase 1. Milestones 1.0 (foundations) and 1.1 (auth, workspaces, row-level security) complete.
+> **Status:** Phase 1. Foundations, auth and workspaces, the multi-provider AI router with streaming chat, and the first version of the web app (sign-in and chat) are complete.
 
 ## Repository layout
 
@@ -30,12 +30,14 @@ Planned packages (added in later milestones): `db`, `core`, `ai`,
 ```bash
 corepack enable
 pnpm install
-pnpm db:start                    # requires Docker
-cp .env.example apps/api/.env    # then paste PUBLISHABLE_KEY from `pnpm db:status`
+pnpm db:start                              # requires Docker
+cp .env.example apps/api/.env              # paste PUBLISHABLE_KEY from `pnpm db:status`,
+                                           # set AI_PROVIDERS and a provider key
+cp apps/web/.env.example apps/web/.env.local   # same PUBLISHABLE_KEY
 pnpm dev
 ```
 
-- Web: http://localhost:3000
+- Web: http://localhost:3000 (sign in, then chat at /app)
 - API: http://localhost:4000/health
 - Supabase Studio: http://localhost:54323 (with `pnpm db:start:full`)
 

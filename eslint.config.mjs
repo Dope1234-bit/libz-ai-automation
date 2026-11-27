@@ -47,5 +47,10 @@ export default tseslint.config(
       ...nextPlugin.configs["core-web-vitals"].rules,
     },
   },
+  {
+    // Playwright tests run code in the browser via page.evaluate().
+    files: ["apps/web/e2e/**/*.mjs"],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
   prettier,
 );
