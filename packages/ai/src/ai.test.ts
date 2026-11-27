@@ -341,6 +341,25 @@ describe("createGeminiProvider", () => {
     expect(events.at(-1)).toMatchObject({ type: "finish", finishReason: "content_filter" });
   });
 
+  it("gives up quickly on a stalled model so the router can fall back", async () => {
+    const provider = createGeminiProvider({
+      timeouts: { firstByteMs: 50 },
+      // Never responds until aborted, like an overloaded model that accepts the connection.
+      fetch: (_url, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(new Error("aborted")));
+        }),
+    });
+    const started = Date.now();
+    const err = await collect(provider.streamChat("m", { messages: [] })).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ProviderError);
+    expect(err).toMatchObject({
+      retryable: true,
+      message: "Model provider did not respond in time.",
+    });
+    expect(Date.now() - started).toBeLessThan(2000);
+  });
+
   it("treats retired models (404) and overload (503) as retryable", async () => {
     for (const status of [404, 503]) {
       const provider = createGeminiProvider({ fetch: async () => new Response("{}", { status }) });

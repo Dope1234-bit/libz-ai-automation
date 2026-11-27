@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { providerHttpError, requestSignal } from "./http.js";
+import type { Timeouts } from "./http.js";
+import { DEFAULT_TIMEOUTS, fetchWithTimeouts, providerHttpError } from "./http.js";
 import { parseSseData } from "./sse.js";
 import type { ChatRequest, ModelProvider, StreamEvent, TokenUsage } from "./types.js";
 import { ProviderError } from "./types.js";
@@ -9,7 +10,7 @@ export interface GeminiOptions {
   baseURL?: string;
   /** Sent as `x-goog-api-key`. Omit when a proxy injects it. */
   apiKey?: string;
-  timeoutMs?: number;
+  timeouts?: Partial<Timeouts>;
   fetch?: typeof fetch;
 }
 
@@ -59,7 +60,7 @@ export function createGeminiProvider(options: GeminiOptions = {}): ModelProvider
     "",
   );
   const doFetch = options.fetch ?? fetch;
-  const timeoutMs = options.timeoutMs ?? 60_000;
+  const timeouts = { ...DEFAULT_TIMEOUTS, ...options.timeouts };
 
   return {
     id,
@@ -73,11 +74,12 @@ export function createGeminiProvider(options: GeminiOptions = {}): ModelProvider
         }));
 
       const url = `${baseURL}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`;
-      let response: Response;
-      try {
-        response = await doFetch(url, {
+      const response = await fetchWithTimeouts(
+        id,
+        doFetch,
+        url,
+        {
           method: "POST",
-          signal: requestSignal(request.signal, timeoutMs),
           headers: {
             "Content-Type": "application/json",
             Accept: "text/event-stream",
@@ -93,14 +95,10 @@ export function createGeminiProvider(options: GeminiOptions = {}): ModelProvider
               ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
             },
           }),
-        });
-      } catch (err) {
-        if (request.signal?.aborted) throw err;
-        throw new ProviderError(id, "Network error contacting model provider.", {
-          retryable: true,
-          cause: err,
-        });
-      }
+        },
+        request.signal,
+        timeouts,
+      );
 
       if (!response.ok || !response.body) throw await providerHttpError(id, response);
 

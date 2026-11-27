@@ -31,7 +31,11 @@ export interface AppDeps {
  * real Supabase-backed implementations and can be swapped in tests.
  */
 export function createApp(env: Env, deps: Partial<AppDeps> = {}) {
-  const verifyToken = deps.verifyToken ?? createSupabaseTokenVerifier(env.SUPABASE_URL);
+  const verifyToken =
+    deps.verifyToken ??
+    createSupabaseTokenVerifier(env.SUPABASE_URL, undefined, {
+      publishableKey: env.SUPABASE_PUBLISHABLE_KEY,
+    });
   const createUserDb =
     deps.createUserDb ?? createUserDbFactory(env.SUPABASE_URL, env.SUPABASE_PUBLISHABLE_KEY);
   const chat: ChatSettings = deps.chat ?? {

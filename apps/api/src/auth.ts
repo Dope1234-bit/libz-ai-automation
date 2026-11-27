@@ -1,7 +1,13 @@
 import { AppError, ErrorCode } from "@jarvis/shared";
 import type { MiddlewareHandler } from "hono";
-import type { JWTVerifyGetKey } from "jose";
-import { createRemoteJWKSet, errors as joseErrors, jwtVerify } from "jose";
+import type { JWTPayload, JWTVerifyGetKey } from "jose";
+import {
+  createRemoteJWKSet,
+  decodeJwt,
+  decodeProtectedHeader,
+  errors as joseErrors,
+  jwtVerify,
+} from "jose";
 import type { AppEnv } from "./context.js";
 
 export interface AuthUser {
@@ -14,49 +20,86 @@ export interface AuthUser {
 
 export type TokenVerifier = (token: string) => Promise<AuthUser>;
 
-// Only asymmetric algorithms: a shared-secret (HS*) token is never accepted, which
-// rules out algorithm-confusion attacks and means the API holds no signing secret.
-const ALLOWED_ALGORITHMS = ["ES256", "RS256", "EdDSA"];
+// Tokens signed with asymmetric keys are verified locally against the JWKS. We
+// never verify an HS* token ourselves (no shared secret is held, which also rules
+// out algorithm-confusion attacks); projects still on a legacy shared secret are
+// validated by asking Supabase Auth instead.
+const ASYMMETRIC_ALGORITHMS = ["ES256", "RS256", "EdDSA"];
+
+export interface TokenVerifierOptions {
+  /** Enables server-side validation of legacy HS256 tokens via Supabase Auth. */
+  publishableKey?: string;
+  fetch?: typeof fetch;
+}
+
+const unauthenticated = () =>
+  new AppError(ErrorCode.Unauthenticated, "Invalid or expired access token.");
+
+function toAuthUser(payload: JWTPayload): AuthUser {
+  if (payload.role !== "authenticated" || typeof payload.sub !== "string") {
+    throw unauthenticated();
+  }
+  return {
+    id: payload.sub,
+    email: typeof payload.email === "string" ? payload.email : null,
+    aal: payload.aal === "aal2" ? "aal2" : "aal1",
+    sessionId: typeof payload.session_id === "string" ? payload.session_id : null,
+  };
+}
 
 /**
- * Verify Supabase access tokens locally against the project's published JWKS.
- * Keys are fetched once and cached; unknown `kid`s trigger a (rate-limited) refetch,
- * so key rotation works without restarts.
+ * Verify Supabase access tokens. Asymmetric tokens are checked locally against
+ * the project's published JWKS (keys cached; unknown `kid`s trigger a
+ * rate-limited refetch, so key rotation works without restarts).
  */
 export function createSupabaseTokenVerifier(
   supabaseUrl: string,
   keys: JWTVerifyGetKey = createRemoteJWKSet(
     new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`),
   ),
+  options: TokenVerifierOptions = {},
 ): TokenVerifier {
   const issuer = `${supabaseUrl}/auth/v1`;
+  const doFetch = options.fetch ?? fetch;
 
   return async (token) => {
-    let payload;
+    let alg: string | undefined;
     try {
-      ({ payload } = await jwtVerify(token, keys, {
-        issuer,
-        audience: "authenticated",
-        algorithms: ALLOWED_ALGORITHMS,
-        requiredClaims: ["sub", "exp"],
-      }));
-    } catch (err) {
-      if (err instanceof joseErrors.JOSEError) {
-        throw new AppError(ErrorCode.Unauthenticated, "Invalid or expired access token.");
+      alg = decodeProtectedHeader(token).alg;
+    } catch {
+      throw unauthenticated();
+    }
+
+    if (alg && ASYMMETRIC_ALGORITHMS.includes(alg)) {
+      try {
+        const { payload } = await jwtVerify(token, keys, {
+          issuer,
+          audience: "authenticated",
+          algorithms: ASYMMETRIC_ALGORITHMS,
+          requiredClaims: ["sub", "exp"],
+        });
+        return toAuthUser(payload);
+      } catch (err) {
+        if (err instanceof joseErrors.JOSEError) throw unauthenticated();
+        throw err;
       }
-      throw err;
     }
 
-    if (payload.role !== "authenticated" || typeof payload.sub !== "string") {
-      throw new AppError(ErrorCode.Unauthenticated, "Invalid or expired access token.");
+    if (alg === "HS256" && options.publishableKey) {
+      // Supabase Auth checks the signature, expiry and session for us.
+      const res = await doFetch(`${issuer}/user`, {
+        headers: { apikey: options.publishableKey, Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(10_000),
+      }).catch(() => null);
+      if (!res?.ok) throw unauthenticated();
+      const user = (await res.json().catch(() => null)) as { id?: unknown } | null;
+      // Safe to read the claims now that Auth has validated the token.
+      const payload = decodeJwt(token);
+      if (!user || user.id !== payload.sub) throw unauthenticated();
+      return toAuthUser(payload);
     }
 
-    return {
-      id: payload.sub,
-      email: typeof payload.email === "string" ? payload.email : null,
-      aal: payload.aal === "aal2" ? "aal2" : "aal1",
-      sessionId: typeof payload.session_id === "string" ? payload.session_id : null,
-    };
+    throw unauthenticated();
   };
 }
 

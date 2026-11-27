@@ -63,11 +63,46 @@ describe("createSupabaseTokenVerifier", () => {
     await expect(verify(await sign({}, other.privateKey))).rejects.toBeInstanceOf(AppError);
   });
 
-  it("rejects symmetric (HS256) tokens to prevent algorithm confusion", async () => {
+  it("never verifies HS256 tokens locally (no shared secret, no algorithm confusion)", async () => {
     const secret = new TextEncoder().encode(
       "super-secret-jwt-token-with-at-least-32-characters-long",
     );
     await expect(verify(await sign({}, secret, "HS256"))).rejects.toBeInstanceOf(AppError);
+  });
+
+  it("validates legacy HS256 tokens with Supabase Auth when enabled", async () => {
+    const secret = new TextEncoder().encode("legacy-project-secret-with-32-characters!!");
+    const token = await sign({}, secret, "HS256");
+    const calls: string[] = [];
+    const legacy = createSupabaseTokenVerifier(SUPABASE_URL, createLocalJWKSet({ keys: [] }), {
+      publishableKey: "pk",
+      fetch: async (url, init) => {
+        calls.push(String(url));
+        const auth = new Headers(init?.headers).get("authorization");
+        return auth === `Bearer ${token}`
+          ? Response.json({ id: USER_ID })
+          : new Response("{}", { status: 401 });
+      },
+    });
+    expect((await legacy(token)).id).toBe(USER_ID);
+    expect(calls).toEqual([`${ISSUER}/user`]);
+
+    // A forged token is rejected by Supabase Auth.
+    const forged = await sign(
+      { sub: "22222222-2222-4222-8222-222222222222" },
+      new TextEncoder().encode("x".repeat(32)),
+      "HS256",
+    );
+    await expect(legacy(forged)).rejects.toBeInstanceOf(AppError);
+  });
+
+  it("rejects HS256 tokens whose subject does not match the validated user", async () => {
+    const token = await sign({}, new TextEncoder().encode("y".repeat(32)), "HS256");
+    const legacy = createSupabaseTokenVerifier(SUPABASE_URL, createLocalJWKSet({ keys: [] }), {
+      publishableKey: "pk",
+      fetch: async () => Response.json({ id: "someone-else" }),
+    });
+    await expect(legacy(token)).rejects.toBeInstanceOf(AppError);
   });
 
   it("rejects garbage", async () => {

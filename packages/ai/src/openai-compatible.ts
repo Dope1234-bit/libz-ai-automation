@@ -2,7 +2,8 @@ import { z } from "zod";
 import { parseSseData } from "./sse.js";
 import type { ChatRequest, ModelProvider, StreamEvent, TokenUsage } from "./types.js";
 import { ProviderError } from "./types.js";
-import { providerHttpError } from "./http.js";
+import type { Timeouts } from "./http.js";
+import { DEFAULT_TIMEOUTS, fetchWithTimeouts, providerHttpError } from "./http.js";
 
 export interface OpenAICompatibleOptions {
   id: string;
@@ -12,8 +13,7 @@ export interface OpenAICompatibleOptions {
   apiKey?: string;
   /** Extra headers, e.g. a provider-specific key header. */
   headers?: Record<string, string>;
-  /** Abort a request that has produced nothing for this long. */
-  timeoutMs?: number;
+  timeouts?: Partial<Timeouts>;
   fetch?: typeof fetch;
 }
 
@@ -42,19 +42,17 @@ const chunkSchema = z.object({
 export function createOpenAICompatibleProvider(options: OpenAICompatibleOptions): ModelProvider {
   const doFetch = options.fetch ?? fetch;
   const url = `${options.baseURL.replace(/\/+$/, "")}/chat/completions`;
-  const timeoutMs = options.timeoutMs ?? 60_000;
+  const timeouts = { ...DEFAULT_TIMEOUTS, ...options.timeouts };
 
   return {
     id: options.id,
     async *streamChat(model: string, request: ChatRequest): AsyncGenerator<StreamEvent> {
-      const timeout = AbortSignal.timeout(timeoutMs);
-      const signal = request.signal ? AbortSignal.any([request.signal, timeout]) : timeout;
-
-      let response: Response;
-      try {
-        response = await doFetch(url, {
+      const response = await fetchWithTimeouts(
+        options.id,
+        doFetch,
+        url,
+        {
           method: "POST",
-          signal,
           headers: {
             "Content-Type": "application/json",
             Accept: "text/event-stream",
@@ -69,14 +67,10 @@ export function createOpenAICompatibleProvider(options: OpenAICompatibleOptions)
             ...(request.maxOutputTokens ? { max_tokens: request.maxOutputTokens } : {}),
             ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
           }),
-        });
-      } catch (err) {
-        if (request.signal?.aborted) throw err;
-        throw new ProviderError(options.id, "Network error contacting model provider.", {
-          retryable: true,
-          cause: err,
-        });
-      }
+        },
+        request.signal,
+        timeouts,
+      );
 
       if (!response.ok || !response.body) throw await providerHttpError(options.id, response);
 

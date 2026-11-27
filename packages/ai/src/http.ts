@@ -26,7 +26,45 @@ export async function providerHttpError(
   });
 }
 
-export function requestSignal(signal: AbortSignal | undefined, timeoutMs: number): AbortSignal {
-  const timeout = AbortSignal.timeout(timeoutMs);
-  return signal ? AbortSignal.any([signal, timeout]) : timeout;
+export interface Timeouts {
+  /** Give up if the provider has not started responding by then (overloaded models often stall). */
+  firstByteMs: number;
+  /** Hard cap for the whole streamed response. */
+  totalMs: number;
+}
+
+export const DEFAULT_TIMEOUTS: Timeouts = { firstByteMs: 20_000, totalMs: 120_000 };
+
+/**
+ * fetch() with a first-byte timeout and an overall timeout. A stall before the
+ * response headers arrive becomes a retryable ProviderError, so the router can
+ * move on to the next model quickly.
+ */
+export async function fetchWithTimeouts(
+  provider: string,
+  doFetch: typeof fetch,
+  url: string,
+  init: RequestInit,
+  callerSignal: AbortSignal | undefined,
+  timeouts: Timeouts,
+): Promise<Response> {
+  const firstByte = new AbortController();
+  const timer = setTimeout(() => firstByte.abort(), timeouts.firstByteMs);
+  const signals = [AbortSignal.timeout(timeouts.totalMs), firstByte.signal];
+  if (callerSignal) signals.push(callerSignal);
+  try {
+    return await doFetch(url, { ...init, signal: AbortSignal.any(signals) });
+  } catch (err) {
+    if (callerSignal?.aborted) throw err;
+    const stalled = firstByte.signal.aborted;
+    throw new ProviderError(
+      provider,
+      stalled
+        ? "Model provider did not respond in time."
+        : "Network error contacting model provider.",
+      { retryable: true, cause: err },
+    );
+  } finally {
+    clearTimeout(timer);
+  }
 }

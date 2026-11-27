@@ -18,7 +18,8 @@ export async function proxy(request: NextRequest) {
     `style-src 'self' 'nonce-${nonce}'`,
     "img-src 'self' blob: data:",
     "font-src 'self'",
-    `connect-src 'self' ${appConfig.apiUrl} ${appConfig.supabaseUrl}`,
+    // A relative API URL (same-origin /api) is already covered by 'self'.
+    `connect-src 'self'${appConfig.apiUrl.startsWith("http") ? ` ${appConfig.apiUrl}` : ""} ${appConfig.supabaseUrl}`,
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -67,6 +68,6 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Everything except static assets and the health check.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/health).*)"],
+  // Pages only: not static assets, and not /api (the API checks its own auth).
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/).*)"],
 };
