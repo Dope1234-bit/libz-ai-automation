@@ -2,6 +2,7 @@ import { z } from "zod";
 import { parseSseData } from "./sse.js";
 import type { ChatRequest, ModelProvider, StreamEvent, TokenUsage } from "./types.js";
 import { ProviderError } from "./types.js";
+import { providerHttpError } from "./http.js";
 
 export interface OpenAICompatibleOptions {
   id: string;
@@ -32,14 +33,6 @@ const chunkSchema = z.object({
     })
     .nullish(),
 });
-
-function parseRetryAfter(value: string | null): number | null {
-  if (!value) return null;
-  const seconds = Number(value);
-  if (Number.isFinite(seconds) && seconds >= 0) return Math.min(seconds, 3600);
-  const date = Date.parse(value);
-  return Number.isNaN(date) ? null : Math.max(0, Math.min((date - Date.now()) / 1000, 3600));
-}
 
 /**
  * Streaming client for any OpenAI-compatible chat completions API. Covers Gemini
@@ -85,16 +78,7 @@ export function createOpenAICompatibleProvider(options: OpenAICompatibleOptions)
         });
       }
 
-      if (!response.ok || !response.body) {
-        const status = response.status;
-        // Drain without surfacing the body: provider errors can echo request content.
-        await response.body?.cancel().catch(() => undefined);
-        throw new ProviderError(options.id, `Model provider returned HTTP ${status}.`, {
-          status,
-          retryable: status === 408 || status === 429 || status >= 500,
-          retryAfterSeconds: parseRetryAfter(response.headers.get("retry-after")),
-        });
-      }
+      if (!response.ok || !response.body) throw await providerHttpError(options.id, response);
 
       yield { type: "start", provider: options.id, model };
 

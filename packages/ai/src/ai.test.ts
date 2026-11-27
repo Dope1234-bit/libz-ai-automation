@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildAiFromEnv,
   buildSystemPrompt,
+  createGeminiProvider,
   createModelRouter,
   createOpenAICompatibleProvider,
   fitHistory,
@@ -224,6 +225,26 @@ describe("createModelRouter", () => {
     expect(a.calls.length).toBe(2); // retried after the cooldown
   });
 
+  it("cools down a single model, not its whole provider", async () => {
+    const g = fakeProvider("g", (model) =>
+      model === "big"
+        ? new ProviderError("g", "overloaded", { status: 503, retryable: true })
+        : ok("g", "lite"),
+    );
+    const router = createModelRouter({
+      providers: [g],
+      routes: {
+        chat: [
+          { provider: "g", model: "big" },
+          { provider: "g", model: "lite" },
+        ],
+      },
+    });
+    await collect(router.stream("chat", { messages: [] }));
+    await collect(router.stream("chat", { messages: [] }));
+    expect(g.calls).toEqual(["big", "lite", "lite"]);
+  });
+
   it("does not switch models after text has been streamed", async () => {
     const a: ModelProvider = {
       id: "a",
@@ -267,6 +288,70 @@ describe("createModelRouter", () => {
   });
 });
 
+describe("createGeminiProvider", () => {
+  it("maps roles, streams text and counts thinking tokens as output", async () => {
+    const fetchMock = vi.fn(async () =>
+      sseResponse([
+        { candidates: [{ content: { parts: [{ text: "Hel" }], role: "model" } }] },
+        {
+          candidates: [{ content: { parts: [{ text: "lo" }] }, finishReason: "MAX_TOKENS" }],
+          usageMetadata: { promptTokenCount: 20, candidatesTokenCount: 5, thoughtsTokenCount: 7 },
+        },
+      ]),
+    );
+    const provider = createGeminiProvider({ fetch: fetchMock });
+    const events = await collect(
+      provider.streamChat("gemini-test", {
+        messages: [
+          { role: "system", content: "Be brief." },
+          { role: "user", content: "hi" },
+          { role: "assistant", content: "hello" },
+          { role: "user", content: "again" },
+        ],
+        maxOutputTokens: 64,
+      }),
+    );
+    expect(events).toEqual([
+      { type: "start", provider: "gemini", model: "gemini-test" },
+      { type: "text", delta: "Hel" },
+      { type: "text", delta: "lo" },
+      { type: "finish", finishReason: "length", usage: { inputTokens: 20, outputTokens: 12 } },
+    ]);
+    const body = JSON.parse(
+      (fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string,
+    );
+    expect(body).toEqual({
+      systemInstruction: { parts: [{ text: "Be brief." }] },
+      contents: [
+        { role: "user", parts: [{ text: "hi" }] },
+        { role: "model", parts: [{ text: "hello" }] },
+        { role: "user", parts: [{ text: "again" }] },
+      ],
+      generationConfig: { maxOutputTokens: 64 },
+    });
+  });
+
+  it("reports safety blocks as content_filter", async () => {
+    const provider = createGeminiProvider({
+      fetch: async () => sseResponse([{ promptFeedback: { blockReason: "SAFETY" } }]),
+    });
+    const events = await collect(
+      provider.streamChat("m", { messages: [{ role: "user", content: "x" }] }),
+    );
+    expect(events.at(-1)).toMatchObject({ type: "finish", finishReason: "content_filter" });
+  });
+
+  it("treats retired models (404) and overload (503) as retryable", async () => {
+    for (const status of [404, 503]) {
+      const provider = createGeminiProvider({ fetch: async () => new Response("{}", { status }) });
+      await expect(collect(provider.streamChat("m", { messages: [] }))).rejects.toMatchObject({
+        status,
+        retryable: true,
+      });
+    }
+  });
+});
+
 describe("buildAiFromEnv", () => {
   it("requires keys unless they are injected by a proxy", () => {
     expect(() => buildAiFromEnv({ AI_PROVIDERS: "gemini" })).toThrow(
@@ -277,25 +362,40 @@ describe("buildAiFromEnv", () => {
     ]);
   });
 
-  it("sends the Gemini key in its own header and honours model overrides", async () => {
-    const fetchMock = vi.fn(async () => sseResponse([chunk("ok", "stop"), "[DONE]"]));
+  it("uses Gemini's native API with its key header, and model fallbacks from overrides", async () => {
+    const fetchMock = vi.fn(async () =>
+      sseResponse([
+        { candidates: [{ content: { parts: [{ text: "ok" }] }, finishReason: "STOP" }] },
+      ]),
+    );
     const { router } = buildAiFromEnv(
       {
         AI_PROVIDERS: "gemini,ollama",
         GOOGLE_GENERATIVE_AI_API_KEY: "g-key",
-        GEMINI_CHAT_MODEL: "gemini-x",
+        GEMINI_CHAT_MODEL: "gemini-x, gemini-y",
       },
       fetchMock,
     );
     expect(router.candidates("chat")).toEqual([
       { provider: "gemini", model: "gemini-x" },
+      { provider: "gemini", model: "gemini-y" },
       { provider: "ollama", model: "llama3.2" },
     ]);
     await collect(router.stream("chat", { messages: [] }));
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toContain("generativelanguage.googleapis.com");
+    expect(url).toBe(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-x:streamGenerateContent?alt=sse",
+    );
     expect((init.headers as Record<string, string>)["x-goog-api-key"]).toBe("g-key");
     expect((init.headers as Record<string, string>).Authorization).toBeUndefined();
+  });
+
+  it("defaults Gemini to auto-updating aliases with a lighter fallback", () => {
+    const { router } = buildAiFromEnv({ AI_PROVIDERS: "gemini", AI_KEYS_VIA_PROXY: "true" });
+    expect(router.candidates("chat").map((r) => r.model)).toEqual([
+      "gemini-flash-latest",
+      "gemini-flash-lite-latest",
+    ]);
   });
 
   it("rejects unknown providers", () => {

@@ -5,7 +5,7 @@ export interface ModelRouterOptions {
   providers: readonly ModelProvider[];
   /** Ordered candidates per task; the first available one wins. */
   routes: Partial<Record<TaskType, readonly ModelRef[]>>;
-  /** Default pause for a provider after a rate limit or outage. */
+  /** Default pause for a model after a rate limit or outage. */
   cooldownSeconds?: number;
   now?: () => number;
 }
@@ -44,7 +44,8 @@ export function createModelRouter(options: ModelRouterOptions): ModelRouter {
       const attempts: { provider: string; model: string; reason: string }[] = [];
 
       for (const ref of candidates(task)) {
-        const until = coolingUntil.get(ref.provider) ?? 0;
+        const key = `${ref.provider}/${ref.model}`;
+        const until = coolingUntil.get(key) ?? 0;
         if (until > now()) {
           attempts.push({ ...ref, reason: "cooling down" });
           continue;
@@ -62,10 +63,7 @@ export function createModelRouter(options: ModelRouterOptions): ModelRouter {
         } catch (err) {
           if (produced || request.signal?.aborted) throw err;
           if (err instanceof ProviderError && err.retryable) {
-            coolingUntil.set(
-              ref.provider,
-              now() + (err.retryAfterSeconds ?? cooldownSeconds) * 1000,
-            );
+            coolingUntil.set(key, now() + (err.retryAfterSeconds ?? cooldownSeconds) * 1000);
           }
           attempts.push({ ...ref, reason: err instanceof Error ? err.message : String(err) });
         }

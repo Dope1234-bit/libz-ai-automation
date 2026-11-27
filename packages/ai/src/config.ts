@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { createGeminiProvider } from "./gemini.js";
 import { createOpenAICompatibleProvider } from "./openai-compatible.js";
 import type { ModelRouter } from "./router.js";
 import { createModelRouter } from "./router.js";
@@ -7,9 +8,14 @@ import type { ModelProvider, ModelRef, TaskType } from "./types.js";
 /** Known free-tier-friendly providers, all reached through OpenAI-compatible APIs. */
 export const PROVIDER_PRESETS = {
   gemini: {
-    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
+    // Native API (see gemini.ts). Defaults use Google's auto-updating aliases,
+    // because pinned free-tier model names are retired often.
+    baseURL: "https://generativelanguage.googleapis.com/v1beta",
     keyEnv: "GOOGLE_GENERATIVE_AI_API_KEY",
-    defaults: { chat: "gemini-2.5-flash", fast: "gemini-2.5-flash-lite" },
+    defaults: {
+      chat: "gemini-flash-latest,gemini-flash-lite-latest",
+      fast: "gemini-flash-lite-latest,gemini-flash-latest",
+    },
   },
   groq: {
     baseURL: "https://api.groq.com/openai/v1",
@@ -58,12 +64,18 @@ const aiEnvSchema = z.object({
   OLLAMA_BASE_URL: z.url().optional(),
 });
 
-/** Per-provider model overrides: GEMINI_CHAT_MODEL, GROQ_FAST_MODEL, ... */
-function modelFor(source: Record<string, string | undefined>, name: ProviderName, task: TaskType) {
-  return (
+/**
+ * Per-provider model overrides, e.g. GEMINI_CHAT_MODEL or GROQ_FAST_MODEL. A
+ * comma-separated list gives fallbacks within the provider, tried in order.
+ */
+function modelsFor(source: Record<string, string | undefined>, name: ProviderName, task: TaskType) {
+  const raw =
     source[`${name.toUpperCase()}_${task.toUpperCase()}_MODEL`]?.trim() ||
-    PROVIDER_PRESETS[name].defaults[task]
-  );
+    PROVIDER_PRESETS[name].defaults[task];
+  return raw
+    .split(",")
+    .map((m) => m.trim())
+    .filter(Boolean);
 }
 
 export interface AiConfig {
@@ -89,21 +101,25 @@ export function buildAiFromEnv(
         ? `${env.OLLAMA_BASE_URL.replace(/\/+$/, "")}/v1`
         : preset.baseURL;
     providers.push(
-      createOpenAICompatibleProvider({
-        id: name,
-        baseURL,
-        ...(key
-          ? name === "gemini"
-            ? { headers: { "x-goog-api-key": key } }
-            : { apiKey: key }
-          : {}),
-        ...(fetchImpl ? { fetch: fetchImpl } : {}),
-      }),
+      name === "gemini"
+        ? createGeminiProvider({
+            baseURL,
+            ...(key ? { apiKey: key } : {}),
+            ...(fetchImpl ? { fetch: fetchImpl } : {}),
+          })
+        : createOpenAICompatibleProvider({
+            id: name,
+            baseURL,
+            ...(key ? { apiKey: key } : {}),
+            ...(fetchImpl ? { fetch: fetchImpl } : {}),
+          }),
     );
   }
 
   const route = (task: TaskType): ModelRef[] =>
-    env.AI_PROVIDERS.map((name) => ({ provider: name, model: modelFor(source, name, task) }));
+    env.AI_PROVIDERS.flatMap((name) =>
+      modelsFor(source, name, task).map((model) => ({ provider: name, model })),
+    );
 
   return {
     enabled: env.AI_PROVIDERS,

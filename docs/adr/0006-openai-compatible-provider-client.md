@@ -32,6 +32,21 @@ has no runtime dependency other than Zod.
   variables (for example `GEMINI_CHAT_MODEL`), because free-tier model names
   change often.
 
+## Amendment (live testing, 2026-11-27)
+
+The first live test against Gemini found three things mocked tests could not:
+
+1. Gemini's OpenAI-compatible endpoint only accepts `Authorization: Bearer`,
+   not the `x-goog-api-key` header. Gemini therefore uses a **native client**
+   (`gemini.ts`, `streamGenerateContent`), while the other providers keep the
+   OpenAI-compatible client.
+2. Pinned free-tier models are retired for new users (`gemini-2.5-flash`
+   returned 404). Defaults now use Google's auto-updating aliases, and a 404
+   is retryable, so the router moves on to the next model.
+3. Free-tier models are often overloaded (503). Each provider can list several
+   models, and the cooldown applies **per model**, so an overloaded model does
+   not block its lighter sibling.
+
 ## Consequences
 
 - Small supply-chain surface and full control over retries, timeouts and
