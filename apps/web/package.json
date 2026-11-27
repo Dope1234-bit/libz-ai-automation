@@ -9,7 +9,7 @@
     "start": "next start --port 3000",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
-    "test:e2e": "node e2e/chat.e2e.mjs"
+    "test:e2e": "node e2e/chat.e2e.mjs && node e2e/business.e2e.mjs"
   },
   "dependencies": {
     "@jarvis/api": "workspace:*",

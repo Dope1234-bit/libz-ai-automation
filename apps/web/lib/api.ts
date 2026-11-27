@@ -138,6 +138,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 export const api = {
+  /** Low-level authenticated request, used by the CRM client. */
+  raw: <T>(method: string, path: string, body?: unknown) => request<T>(method, path, body),
   me: () => request<Me>("GET", "/v1/me"),
   createWorkspace: (name: string) =>
     request<{ workspace: Workspace }>("POST", "/v1/workspaces", { name }),

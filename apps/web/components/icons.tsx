@@ -128,3 +128,50 @@ export const ActivityIcon = (p: IconProps) => (
     <path d="M3 12h4l3 8 4-16 3 8h4" />
   </Icon>
 );
+
+export const ClientsIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16M16 9h2a2 2 0 0 1 2 2v10M3 21h18M8 7h4M8 11h4M8 15h4" />
+  </Icon>
+);
+
+export const PipelineIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="3" y="4" width="5" height="16" rx="1.5" />
+    <rect x="10" y="4" width="5" height="11" rx="1.5" />
+    <rect x="17" y="4" width="4" height="7" rx="1.5" />
+  </Icon>
+);
+
+export const TasksIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="3" y="3" width="18" height="18" rx="3" />
+    <path d="m8 12 3 3 5-6" />
+  </Icon>
+);
+
+export const ProjectsIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
+  </Icon>
+);
+
+export const ReportsIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 20V10M10 20V4M16 20v-7M21 20H3" />
+  </Icon>
+);
+
+export const MoreIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="6" cy="12" r="1.3" />
+    <circle cx="12" cy="12" r="1.3" />
+    <circle cx="18" cy="12" r="1.3" />
+  </Icon>
+);
+
+export const CheckIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="m5 12 5 5 9-10" />
+  </Icon>
+);

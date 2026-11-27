@@ -7,6 +7,7 @@ import type { AuditEvent, ConversationSummary, Member, SystemStatus, Usage } fro
 import { api } from "@/lib/api";
 import { useWorkspace } from "@/lib/workspace-context";
 import { ArrowIcon, SendIcon } from "../icons";
+import { TodayPanels } from "../crm/TodayPanels";
 import { MicButton } from "../MicButton";
 
 function greeting(date: Date): string {
@@ -137,6 +138,8 @@ export function CommandCentre() {
           </span>
         </div>
       </section>
+
+      <TodayPanels />
 
       {/* AI core status */}
       <section className="panel" aria-labelledby="sys-title">
@@ -338,7 +341,23 @@ export function CommandCentre() {
             <span className="tag tag-ok">Online</span>
           </li>
           <li>
-            <span className="dot dot-idle" /> Tasks, calendar &amp; reminders{" "}
+            <span className="dot dot-ok" /> Tasks &amp; in-app reminders{" "}
+            <span className="tag tag-ok">Online</span>
+          </li>
+          <li>
+            <span className="dot dot-ok" /> Clients, pipeline, projects &amp; reports{" "}
+            <span className="tag tag-ok">Online</span>
+          </li>
+          <li>
+            <span className="dot dot-idle" /> Jarvis reading your CRM{" "}
+            <span className="tag">Next</span>
+          </li>
+          <li>
+            <span className="dot dot-idle" /> Calendar, push &amp; email reminders{" "}
+            <span className="tag">Not connected</span>
+          </li>
+          <li>
+            <span className="dot dot-idle" /> WhatsApp &amp; calling{" "}
             <span className="tag">Not connected</span>
           </li>
           <li>
