@@ -12,13 +12,14 @@ Browser ──HTTPS──▶ apps/web (Next.js)  ──▶ apps/api (Hono) ─�
                                          OpenRouter, local Ollama) via provider router
 ```
 
-| Layer                       | Choice                                                  | Decision record                                    |
-| --------------------------- | ------------------------------------------------------- | -------------------------------------------------- |
-| Monorepo                    | pnpm + Turborepo, TypeScript end to end                 | [ADR-0001](adr/0001-typescript-monorepo.md)        |
-| Data, auth, storage, queues | Supabase (Postgres 17, pgvector, Auth, Storage, Queues) | [ADR-0002](adr/0002-supabase-platform.md)          |
-| API                         | Separate Hono service alongside Next.js                 | [ADR-0003](adr/0003-separate-api-service.md)       |
-| Models                      | Multi-provider router, free tiers first                 | [ADR-0004](adr/0004-multi-provider-free-models.md) |
-| Security                    | Tenant isolation, policy engine, approvals              | [ADR-0005](adr/0005-security-model.md)             |
+| Layer                       | Choice                                                  | Decision record                                           |
+| --------------------------- | ------------------------------------------------------- | --------------------------------------------------------- |
+| Monorepo                    | pnpm + Turborepo, TypeScript end to end                 | [ADR-0001](adr/0001-typescript-monorepo.md)               |
+| Data, auth, storage, queues | Supabase (Postgres 17, pgvector, Auth, Storage, Queues) | [ADR-0002](adr/0002-supabase-platform.md)                 |
+| API                         | Separate Hono service alongside Next.js                 | [ADR-0003](adr/0003-separate-api-service.md)              |
+| Models                      | Multi-provider router, free tiers first                 | [ADR-0004](adr/0004-multi-provider-free-models.md)        |
+| Security                    | Tenant isolation, policy engine, approvals              | [ADR-0005](adr/0005-security-model.md)                    |
+| Model client                | One OpenAI-compatible streaming client, own router      | [ADR-0006](adr/0006-openai-compatible-provider-client.md) |
 
 ## AI orchestration
 
@@ -61,7 +62,7 @@ requested by voice also need confirmation on an authenticated device.
 | --- | --------------------------------------------------- | ------- |
 | 1.0 | Repository foundations                              | Done    |
 | 1.1 | Data model, Supabase Auth, workspaces, RLS          | Done    |
-| 1.2 | Orchestrator core, multi-provider router, streaming | Planned |
+| 1.2 | Orchestrator core, multi-provider router, streaming | Done    |
 | 1.3 | Tool registry, policy engine, approvals, audit log  | Planned |
 | 1.4 | Long-term memory v1                                 | Planned |
 | 1.5 | Premium dashboard                                   | Planned |

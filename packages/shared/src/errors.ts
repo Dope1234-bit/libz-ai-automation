@@ -11,6 +11,7 @@ export const ErrorCode = {
   RateLimited: "rate_limited",
   QuotaExceeded: "quota_exceeded",
   Internal: "internal_error",
+  Unavailable: "unavailable",
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -24,6 +25,7 @@ const STATUS_BY_CODE: Record<ErrorCode, number> = {
   rate_limited: 429,
   quota_exceeded: 429,
   internal_error: 500,
+  unavailable: 503,
 };
 
 export interface ErrorBody {

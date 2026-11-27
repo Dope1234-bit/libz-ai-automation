@@ -1,3 +1,4 @@
+import { buildAiFromEnv } from "@jarvis/ai";
 import { AppError, ErrorCode, toErrorBody } from "@jarvis/shared";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
@@ -10,14 +11,18 @@ import type { AppEnv } from "./context.js";
 import type { UserDbFactory } from "./db.js";
 import { createUserDbFactory } from "./db.js";
 import type { Env } from "./env.js";
+import type { ChatSettings } from "./routes/conversations.js";
+import { conversationRoutes } from "./routes/conversations.js";
 import { meRoutes } from "./routes/me.js";
 import { invitationRoutes, workspaceRoutes } from "./routes/workspaces.js";
 
-export const API_VERSION = "0.1.0";
+export const API_VERSION = "0.2.0";
 
 export interface AppDeps {
   verifyToken: TokenVerifier;
   createUserDb: UserDbFactory;
+  /** Defaults to providers configured via AI_* environment variables. */
+  chat: ChatSettings;
 }
 
 /**
@@ -29,6 +34,13 @@ export function createApp(env: Env, deps: Partial<AppDeps> = {}) {
   const verifyToken = deps.verifyToken ?? createSupabaseTokenVerifier(env.SUPABASE_URL);
   const createUserDb =
     deps.createUserDb ?? createUserDbFactory(env.SUPABASE_URL, env.SUPABASE_PUBLISHABLE_KEY);
+  const chat: ChatSettings = deps.chat ?? {
+    router: buildAiFromEnv(process.env).router,
+    dailyTokenLimit: env.AI_DAILY_TOKEN_LIMIT,
+    maxOutputTokens: env.AI_MAX_OUTPUT_TOKENS,
+    historyChars: env.AI_HISTORY_CHARS,
+    requestsPerMinute: env.AI_REQUESTS_PER_MINUTE,
+  };
 
   const app = new Hono<AppEnv>();
 
@@ -75,6 +87,7 @@ export function createApp(env: Env, deps: Partial<AppDeps> = {}) {
   v1.route("/me", meRoutes);
   v1.route("/workspaces", workspaceRoutes);
   v1.route("/invitations", invitationRoutes);
+  v1.route("/", conversationRoutes(chat));
   app.route("/v1", v1);
 
   app.notFound((c) => {

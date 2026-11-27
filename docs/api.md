@@ -38,6 +38,30 @@ is not revealed.
 | DELETE | `/v1/workspaces/:id/invitations/:invitationId` | admin+                              | Revoke an open invitation                            |
 | POST   | `/v1/invitations/accept`                       | invitee (verified email must match) | Accept `{ token }`                                   |
 | GET    | `/v1/workspaces/:id/audit-logs?limit=50`       | admin+                              | Recent audit events (max 200)                        |
+| GET    | `/v1/workspaces/:id/conversations`             | member                              | Your conversations in the workspace (newest first)   |
+| POST   | `/v1/workspaces/:id/conversations`             | member+ (not viewers)               | Start a conversation `{ title? }`                    |
+| GET    | `/v1/conversations/:id`                        | its owner                           | Conversation with messages                           |
+| PATCH  | `/v1/conversations/:id`                        | its owner                           | Rename `{ title }`                                   |
+| DELETE | `/v1/conversations/:id`                        | its owner                           | Delete with all messages                             |
+| POST   | `/v1/conversations/:id/messages`               | its owner                           | Send `{ content }`; streams the reply (SSE, below)   |
+
+## Streaming chat
+
+`POST /v1/conversations/:id/messages` responds with `text/event-stream`:
+
+| Event   | Data                                                                     |
+| ------- | ------------------------------------------------------------------------ |
+| `start` | `{ userMessageId }`: your message was saved                              |
+| `model` | `{ provider, model }`: which model is answering (after any fallback)     |
+| `delta` | `{ text }`: the next piece of the reply                                  |
+| `done`  | `{ messageId, status, usage: { inputTokens, outputTokens, estimated } }` |
+| `error` | `{ code, message }`, e.g. `unavailable` when every model is down         |
+
+Before streaming, the endpoint can return `429` (`rate_limited`: too many requests
+per minute; `quota_exceeded`: daily token limit) or `503` (no AI provider
+configured). Conversations are private to their creator, even from workspace
+admins. If the client disconnects, the partial reply is saved with
+`status: "partial"`.
 
 ## Rules enforced in the database
 

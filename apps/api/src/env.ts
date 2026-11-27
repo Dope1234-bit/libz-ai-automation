@@ -24,6 +24,12 @@ const envSchema = z.object({
    * every query. The service-role/secret key is deliberately not used here.
    */
   SUPABASE_PUBLISHABLE_KEY: z.string().min(20),
+  /** Tokens (input + output) each user may spend per UTC day. */
+  AI_DAILY_TOKEN_LIMIT: z.coerce.number().int().positive().default(200_000),
+  AI_MAX_OUTPUT_TOKENS: z.coerce.number().int().min(64).max(32_000).default(2048),
+  /** Characters of conversation history sent to the model per request. */
+  AI_HISTORY_CHARS: z.coerce.number().int().min(1000).max(500_000).default(24_000),
+  AI_REQUESTS_PER_MINUTE: z.coerce.number().int().min(1).max(600).default(20),
 });
 
 export type Env = z.infer<typeof envSchema>;
