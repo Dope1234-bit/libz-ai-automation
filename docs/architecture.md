@@ -12,13 +12,13 @@ Browser ──HTTPS──▶ apps/web (Next.js)  ──▶ apps/api (Hono) ─�
                                          OpenRouter, local Ollama) via provider router
 ```
 
-| Layer | Choice | Decision record |
-|---|---|---|
-| Monorepo | pnpm + Turborepo, TypeScript end to end | [ADR-0001](adr/0001-typescript-monorepo.md) |
-| Data, auth, storage, queues | Supabase (Postgres 17, pgvector, Auth, Storage, Queues) | [ADR-0002](adr/0002-supabase-platform.md) |
-| API | Separate Hono service alongside Next.js | [ADR-0003](adr/0003-separate-api-service.md) |
-| Models | Multi-provider router, free tiers first | [ADR-0004](adr/0004-multi-provider-free-models.md) |
-| Security | Tenant isolation, policy engine, approvals | [ADR-0005](adr/0005-security-model.md) |
+| Layer                       | Choice                                                  | Decision record                                    |
+| --------------------------- | ------------------------------------------------------- | -------------------------------------------------- |
+| Monorepo                    | pnpm + Turborepo, TypeScript end to end                 | [ADR-0001](adr/0001-typescript-monorepo.md)        |
+| Data, auth, storage, queues | Supabase (Postgres 17, pgvector, Auth, Storage, Queues) | [ADR-0002](adr/0002-supabase-platform.md)          |
+| API                         | Separate Hono service alongside Next.js                 | [ADR-0003](adr/0003-separate-api-service.md)       |
+| Models                      | Multi-provider router, free tiers first                 | [ADR-0004](adr/0004-multi-provider-free-models.md) |
+| Security                    | Tenant isolation, policy engine, approvals              | [ADR-0005](adr/0005-security-model.md)             |
 
 ## AI orchestration
 
@@ -37,12 +37,12 @@ Browser ──HTTPS──▶ apps/web (Next.js)  ──▶ apps/api (Hono) ─�
 
 ## Memory tiers
 
-| Tier | Holds | Lifetime |
-|---|---|---|
-| Working | Current context window | One turn |
-| Conversation | Rolling summary | One thread |
-| Long-term | Extracted facts, preferences, episodes (embedded) | Persistent, user-editable |
-| Knowledge | Uploaded documents, connected sources | Persistent |
+| Tier         | Holds                                             | Lifetime                  |
+| ------------ | ------------------------------------------------- | ------------------------- |
+| Working      | Current context window                            | One turn                  |
+| Conversation | Rolling summary                                   | One thread                |
+| Long-term    | Extracted facts, preferences, episodes (embedded) | Persistent, user-editable |
+| Knowledge    | Uploaded documents, connected sources             | Persistent                |
 
 Memories are scoped to a workspace: personal memories never surface in a business
 workspace. Retrieval is hybrid (pgvector plus full-text) and re-ranked by
@@ -57,12 +57,12 @@ requested by voice also need confirmation on an authenticated device.
 
 ## Phase 1 milestones
 
-| # | Milestone | Status |
-|---|---|---|
-| 1.0 | Repository foundations | In progress |
-| 1.1 | Data model, Supabase Auth, workspaces, RLS | Planned |
-| 1.2 | Orchestrator core, multi-provider router, streaming | Planned |
-| 1.3 | Tool registry, policy engine, approvals, audit log | Planned |
-| 1.4 | Long-term memory v1 | Planned |
-| 1.5 | Premium dashboard | Planned |
-| 1.6 | Hardening, observability, staging | Planned |
+| #   | Milestone                                           | Status      |
+| --- | --------------------------------------------------- | ----------- |
+| 1.0 | Repository foundations                              | In progress |
+| 1.1 | Data model, Supabase Auth, workspaces, RLS          | Planned     |
+| 1.2 | Orchestrator core, multi-provider router, streaming | Planned     |
+| 1.3 | Tool registry, policy engine, approvals, audit log  | Planned     |
+| 1.4 | Long-term memory v1                                 | Planned     |
+| 1.5 | Premium dashboard                                   | Planned     |
+| 1.6 | Hardening, observability, staging                   | Planned     |

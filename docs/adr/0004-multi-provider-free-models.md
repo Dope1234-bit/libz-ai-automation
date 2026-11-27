@@ -13,12 +13,12 @@ into a single provider. Free tiers have tight rate limits and change often.
 All model access goes through a provider router in `packages/ai` (Milestone 1.2).
 Initial providers, each optional and enabled by the presence of its key:
 
-| Provider | Use |
-|---|---|
-| Google AI Studio (Gemini) | Default chat and embeddings |
-| Groq | Low-latency chat and classification |
-| OpenRouter (free models) | Additional free model pool and fallback |
-| Ollama (local) | Offline development, no key |
+| Provider                  | Use                                     |
+| ------------------------- | --------------------------------------- |
+| Google AI Studio (Gemini) | Default chat and embeddings             |
+| Groq                      | Low-latency chat and classification     |
+| OpenRouter (free models)  | Additional free model pool and fallback |
+| Ollama (local)            | Offline development, no key             |
 
 The router picks a model by task type, tracks per-provider rate limits and falls
 back to the next provider on throttling or errors. Paid providers (for example

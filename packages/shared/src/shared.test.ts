@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { AppError, EnvValidationError, ErrorCode, parseEnv, roleAtLeast, toErrorBody } from "./index.js";
+import {
+  AppError,
+  EnvValidationError,
+  ErrorCode,
+  parseEnv,
+  roleAtLeast,
+  toErrorBody,
+} from "./index.js";
 
 describe("parseEnv", () => {
   const schema = z.object({
