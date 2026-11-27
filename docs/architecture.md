@@ -57,12 +57,12 @@ requested by voice also need confirmation on an authenticated device.
 
 ## Phase 1 milestones
 
-| #   | Milestone                                           | Status      |
-| --- | --------------------------------------------------- | ----------- |
-| 1.0 | Repository foundations                              | In progress |
-| 1.1 | Data model, Supabase Auth, workspaces, RLS          | Planned     |
-| 1.2 | Orchestrator core, multi-provider router, streaming | Planned     |
-| 1.3 | Tool registry, policy engine, approvals, audit log  | Planned     |
-| 1.4 | Long-term memory v1                                 | Planned     |
-| 1.5 | Premium dashboard                                   | Planned     |
-| 1.6 | Hardening, observability, staging                   | Planned     |
+| #   | Milestone                                           | Status  |
+| --- | --------------------------------------------------- | ------- |
+| 1.0 | Repository foundations                              | Done    |
+| 1.1 | Data model, Supabase Auth, workspaces, RLS          | Done    |
+| 1.2 | Orchestrator core, multi-provider router, streaming | Planned |
+| 1.3 | Tool registry, policy engine, approvals, audit log  | Planned |
+| 1.4 | Long-term memory v1                                 | Planned |
+| 1.5 | Premium dashboard                                   | Planned |
+| 1.6 | Hardening, observability, staging                   | Planned |

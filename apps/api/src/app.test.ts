@@ -3,7 +3,12 @@ import { describe, expect, it } from "vitest";
 import { createApp } from "./app.js";
 import { loadEnv } from "./env.js";
 
-const env = loadEnv({ NODE_ENV: "test", WEB_ORIGINS: "http://localhost:3000" });
+const env = loadEnv({
+  NODE_ENV: "test",
+  WEB_ORIGINS: "http://localhost:3000",
+  SUPABASE_URL: "http://127.0.0.1:54321",
+  SUPABASE_PUBLISHABLE_KEY: "sb_publishable_test_key_000000",
+});
 const app = createApp(env);
 
 describe("GET /health", () => {
@@ -55,6 +60,16 @@ describe("errors", () => {
 
 describe("loadEnv", () => {
   it("rejects invalid origins", () => {
-    expect(() => loadEnv({ WEB_ORIGINS: "not a url" })).toThrow(EnvValidationError);
+    expect(() =>
+      loadEnv({
+        WEB_ORIGINS: "not a url",
+        SUPABASE_URL: "http://127.0.0.1:54321",
+        SUPABASE_PUBLISHABLE_KEY: "sb_publishable_test_key_000000",
+      }),
+    ).toThrow(EnvValidationError);
+  });
+
+  it("requires Supabase configuration", () => {
+    expect(() => loadEnv({})).toThrow(/SUPABASE_URL/);
   });
 });
