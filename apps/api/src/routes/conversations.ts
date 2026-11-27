@@ -1,4 +1,4 @@
-import type { ChatMessage, ModelRouter, TokenUsage } from "@jarvis/ai";
+import type { ChatMessage, ModelRouter, TokenUsage, ToolCall } from "@jarvis/ai";
 import { buildSystemPrompt, fitHistory, NoModelAvailableError } from "@jarvis/ai";
 import { AppError, ErrorCode } from "@jarvis/shared";
 import { Hono } from "hono";
@@ -7,6 +7,7 @@ import { z } from "zod";
 import type { AppEnv } from "../context.js";
 import { unwrap, unwrapMaybe } from "../db.js";
 import { rateLimitPerUser } from "../rate-limit.js";
+import { runTool, serialiseResult, toolsFor } from "../tools/index.js";
 import { parseBody, uuidParam } from "../validation.js";
 
 export interface ChatSettings {
@@ -24,6 +25,9 @@ const titleSchema = z.string().trim().min(1).max(200);
 const messageSchema = z.object({ content: z.string().trim().min(1).max(20_000) }).strict();
 
 const notFound = () => new AppError(ErrorCode.NotFound, "Conversation not found.");
+
+/** Model turns per reply that may use tools; the turn after must answer in text. */
+const MAX_TOOL_ROUNDS = 5;
 
 /** Rough token estimate (~4 chars/token) when a provider omits usage data. */
 const estimateTokens = (text: string) => Math.ceil(text.length / 4);
@@ -74,7 +78,14 @@ export function conversationRoutes(settings: ChatSettings) {
           .order("created_at")
           .limit(500)
           .then(unwrap);
-        return c.json({ conversation, messages });
+        const proposals = await db
+          .from("ai_proposals")
+          .select("id, kind, summary, payload, status, result_id, created_at")
+          .eq("conversation_id", id)
+          .order("created_at")
+          .limit(200)
+          .then(unwrap);
+        return c.json({ conversation, messages, proposals });
       })
       .patch("/conversations/:conversationId", async (c) => {
         const id = uuidParam(c, "conversationId");
@@ -163,15 +174,26 @@ export function conversationRoutes(settings: ChatSettings) {
             .then(unwrap),
         ]);
 
+        const workspaceType = conversation.workspaces.type;
+        const tools = toolsFor(workspaceType);
+        const toolCtx = {
+          db,
+          workspaceId: conversation.workspace_id,
+          workspaceType,
+          conversationId,
+          userId: c.get("user").id,
+        };
+
         const messages: ChatMessage[] = [
           {
             role: "system",
             content: buildSystemPrompt({
               workspaceName: conversation.workspaces.name,
-              workspaceType: conversation.workspaces.type,
+              workspaceType,
               userDisplayName: profile?.display_name ?? null,
               now: new Date(),
               memories,
+              tools: tools.length > 0,
             }),
           },
           ...fitHistory(
@@ -189,34 +211,85 @@ export function conversationRoutes(settings: ChatSettings) {
           let text = "";
           let provider: string | null = null;
           let model: string | null = null;
-          let usage: TokenUsage | null = null;
+          let usage = null as TokenUsage | null;
           let status: "complete" | "partial" | "error" = "complete";
           let failure: { code: string; message: string } | null = null;
 
           await stream.writeSSE({ event: "start", data: JSON.stringify({ userMessageId }) });
 
+          let usageKnown = true;
           try {
-            for await (const event of settings.router.stream("chat", {
-              messages,
-              maxOutputTokens: settings.maxOutputTokens,
-              signal: requestSignal,
-            })) {
-              if (event.type === "start") {
-                provider = event.provider;
-                model = event.model;
-                await stream.writeSSE({
-                  event: "model",
-                  data: JSON.stringify({ provider, model }),
-                });
-              } else if (event.type === "text") {
-                text += event.delta;
-                await stream.writeSSE({
-                  event: "delta",
-                  data: JSON.stringify({ text: event.delta }),
-                });
+            for (let round = 1; ; round++) {
+              const calls: ToolCall[] = [];
+              let roundText = "";
+              let roundUsage = null as TokenUsage | null;
+              const offerTools = tools.length > 0 && round <= MAX_TOOL_ROUNDS;
+              for await (const event of settings.router.stream("chat", {
+                messages,
+                ...(offerTools ? { tools: tools.map((t) => t.definition) } : {}),
+                maxOutputTokens: settings.maxOutputTokens,
+                signal: requestSignal,
+              })) {
+                if (event.type === "start") {
+                  provider = event.provider;
+                  model = event.model;
+                  await stream.writeSSE({
+                    event: "model",
+                    data: JSON.stringify({ provider, model }),
+                  });
+                } else if (event.type === "text") {
+                  text += event.delta;
+                  roundText += event.delta;
+                  await stream.writeSSE({
+                    event: "delta",
+                    data: JSON.stringify({ text: event.delta }),
+                  });
+                } else if (event.type === "tool_call") {
+                  calls.push(event.call);
+                } else {
+                  roundUsage = event.usage;
+                  if (event.finishReason === "length") status = "partial";
+                }
+              }
+              if (roundUsage) {
+                usage = {
+                  inputTokens: (usage?.inputTokens ?? 0) + roundUsage.inputTokens,
+                  outputTokens: (usage?.outputTokens ?? 0) + roundUsage.outputTokens,
+                };
               } else {
-                usage = event.usage;
-                if (event.finishReason === "length") status = "partial";
+                usageKnown = false;
+              }
+              if (calls.length === 0 || !offerTools) break;
+
+              // Run the requested tools as the user and feed the results back.
+              messages.push({ role: "assistant", content: roundText, toolCalls: calls });
+              for (const call of calls) {
+                await stream.writeSSE({
+                  event: "tool",
+                  data: JSON.stringify({ id: call.id, name: call.name, status: "running" }),
+                });
+                const outcome = await runTool(call.name, call.args, toolCtx);
+                await stream.writeSSE({
+                  event: "tool",
+                  data: JSON.stringify({
+                    id: call.id,
+                    name: call.name,
+                    status: "done",
+                    label: outcome.label,
+                  }),
+                });
+                if (outcome.proposal) {
+                  await stream.writeSSE({
+                    event: "proposal",
+                    data: JSON.stringify(outcome.proposal),
+                  });
+                }
+                messages.push({
+                  role: "tool",
+                  toolCallId: call.id,
+                  name: call.name,
+                  content: serialiseResult(outcome.result),
+                });
               }
             }
           } catch (err) {
@@ -243,10 +316,17 @@ export function conversationRoutes(settings: ChatSettings) {
           }
 
           // Count spend even when the provider omits usage, so limits still hold.
+          const estimatedInput = provider
+            ? estimateTokens(messages.map((m) => m.content).join(""))
+            : 0;
           const inputTokens =
-            usage?.inputTokens ??
-            (provider ? estimateTokens(messages.map((m) => m.content).join("")) : 0);
-          const outputTokens = usage?.outputTokens ?? estimateTokens(text);
+            usageKnown && usage
+              ? usage.inputTokens
+              : Math.max(usage?.inputTokens ?? 0, estimatedInput);
+          const outputTokens =
+            usageKnown && usage
+              ? usage.outputTokens
+              : Math.max(usage?.outputTokens ?? 0, estimateTokens(text));
 
           let assistantMessageId: string | null = null;
           try {
@@ -280,7 +360,7 @@ export function conversationRoutes(settings: ChatSettings) {
               data: JSON.stringify({
                 messageId: assistantMessageId,
                 status,
-                usage: { inputTokens, outputTokens, estimated: usage === null },
+                usage: { inputTokens, outputTokens, estimated: !usageKnown || usage === null },
               }),
             });
           }

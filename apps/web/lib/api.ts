@@ -98,6 +98,17 @@ export interface Invitation {
   created_at: string;
 }
 
+/** A change Jarvis suggested; nothing is saved until the user confirms. */
+export interface Proposal {
+  id: string;
+  kind: "task" | "activity_note";
+  summary: string;
+  payload: Record<string, unknown>;
+  status: "pending" | "confirmed" | "dismissed";
+  result_id: string | null;
+  created_at: string;
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -155,7 +166,7 @@ export const api = {
       {},
     ),
   conversation: (id: string) =>
-    request<{ conversation: ConversationSummary; messages: Message[] }>(
+    request<{ conversation: ConversationSummary; messages: Message[]; proposals?: Proposal[] }>(
       "GET",
       `/v1/conversations/${id}`,
     ),
@@ -199,6 +210,11 @@ export const api = {
   acceptInvitation: (token: string) =>
     request<{ workspaceId: string }>("POST", "/v1/invitations/accept", { token }),
   status: () => request<SystemStatus>("GET", "/v1/system/status"),
+  decideProposal: (id: string, confirm: boolean) =>
+    request<{ proposal: Proposal }>(
+      "POST",
+      `/v1/proposals/${id}/${confirm ? "confirm" : "dismiss"}`,
+    ),
   usage: () => request<Usage>("GET", "/v1/me/usage"),
   members: (workspaceId: string) =>
     request<{ members: Member[] }>("GET", `/v1/workspaces/${workspaceId}/members`),
@@ -213,6 +229,11 @@ export type ChatStreamEvent =
   | { event: "start"; data: { userMessageId: string } }
   | { event: "model"; data: { provider: string; model: string } }
   | { event: "delta"; data: { text: string } }
+  | {
+      event: "tool";
+      data: { id: string; name: string; status: "running" | "done"; label?: string };
+    }
+  | { event: "proposal"; data: Proposal }
   | { event: "done"; data: { messageId: string | null; status: string } }
   | { event: "error"; data: { code: string; message: string } };
 

@@ -112,6 +112,30 @@ won/lost this month, open/overdue/due-today tasks, company and contact counts, a
 activities in the last 7 days. Revenue is derived from won deals only
 (`revenueBasis: "won_deals"`).
 
+## Jarvis tools and proposals
+
+During a chat reply Jarvis may call workspace tools. They run on the server with
+the user's own database session, so row-level security limits them to what the
+user can see. Business workspaces get `search_clients`, `get_client`,
+`pipeline_summary`, `list_deals`, `list_tasks`, `recent_activities`,
+`propose_task` and `propose_activity_note`; personal workspaces get `list_tasks`
+and `propose_task`. At most 5 tool rounds run per reply.
+
+Extra stream events: `tool` (`{ id, name, status: "running" | "done", label? }`)
+and `proposal` (`{ id, kind, summary, payload, status, result_id, created_at }`).
+`GET /v1/conversations/:id` also returns the conversation's `proposals`.
+
+Proposals never write business records. The user decides:
+
+| Method | Path                        | Notes                                                          |
+| ------ | --------------------------- | -------------------------------------------------------------- |
+| `POST` | `/v1/proposals/:id/confirm` | Creates the task or activity → `{ proposal }` with `result_id` |
+| `POST` | `/v1/proposals/:id/dismiss` | Creates nothing → `{ proposal }`                               |
+
+A proposal can be decided once (`400` afterwards), only by the user it belongs
+to (`404` for others), and only with member access at the time of the decision.
+Creation and decision are audited (`jarvis.proposal_*`) without content.
+
 ## Rules enforced in the database
 
 - Every user gets a **personal workspace** at sign-up; it cannot be deleted or

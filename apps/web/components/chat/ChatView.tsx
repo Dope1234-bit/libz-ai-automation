@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ConversationSummary, Message } from "@/lib/api";
+import type { ConversationSummary, Message, Proposal } from "@/lib/api";
 import { api, ApiError, sendMessage } from "@/lib/api";
 import { useWorkspace } from "@/lib/workspace-context";
 import {
@@ -25,8 +25,45 @@ import {
 import { MicButton } from "../MicButton";
 import { RememberDialog } from "../memory/RememberDialog";
 import { Markdown } from "../Markdown";
+import { ProposalCard } from "./ProposalCard";
 
-type UiMessage = Pick<Message, "id" | "role" | "content" | "status"> & { model?: string | null };
+interface ToolActivity {
+  id: string;
+  name: string;
+  status: "running" | "done";
+  label?: string;
+}
+
+type UiMessage = Pick<Message, "id" | "role" | "content" | "status"> & {
+  model?: string | null;
+  created_at?: string;
+  tools?: ToolActivity[];
+  proposals?: Proposal[];
+};
+
+/** What Jarvis is doing while a tool runs (labels for finished tools come from the API). */
+const RUNNING_LABELS: Record<string, string> = {
+  search_clients: "Searching clients…",
+  get_client: "Reading the client record…",
+  pipeline_summary: "Checking the pipeline…",
+  list_deals: "Listing deals…",
+  list_tasks: "Checking tasks…",
+  recent_activities: "Reading recent activity…",
+  propose_task: "Preparing a task…",
+  propose_activity_note: "Preparing a log entry…",
+};
+
+/** Show each saved proposal under the reply that produced it. */
+function attachProposals(messages: Message[], proposals: Proposal[]): UiMessage[] {
+  const out: UiMessage[] = messages.map((m) => ({ ...m }));
+  for (const proposal of proposals) {
+    const target =
+      out.find((m) => m.role === "assistant" && (m.created_at ?? "") >= proposal.created_at) ??
+      out.filter((m) => m.role === "assistant").at(-1);
+    if (target) target.proposals = [...(target.proposals ?? []), proposal];
+  }
+  return out;
+}
 
 export function ChatView({ conversationId }: { conversationId: string | null }) {
   const router = useRouter();
@@ -95,7 +132,7 @@ export function ChatView({ conversationId }: { conversationId: string | null }) 
     if (!conversationId) return;
     api
       .conversation(conversationId)
-      .then((data) => setMessages(data.messages))
+      .then((data) => setMessages(attachProposals(data.messages, data.proposals ?? [])))
       .catch(handleError);
   }, [conversationId, handleError]);
 
@@ -136,7 +173,23 @@ export function ChatView({ conversationId }: { conversationId: string | null }) 
         let reply = "";
         for await (const evt of sendMessage(id, content, controller.signal)) {
           if (evt.event === "model") update({ model: evt.data.model });
-          else if (evt.event === "delta") {
+          else if (evt.event === "tool") {
+            const activity = evt.data;
+            setMessages((prev) =>
+              prev.map((m) => {
+                if (m.id !== replyId) return m;
+                const others = (m.tools ?? []).filter((t) => t.id !== activity.id);
+                return { ...m, tools: [...others, activity] };
+              }),
+            );
+          } else if (evt.event === "proposal") {
+            const proposal = evt.data;
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === replyId ? { ...m, proposals: [...(m.proposals ?? []), proposal] } : m,
+              ),
+            );
+          } else if (evt.event === "delta") {
             reply += evt.data.text;
             update({ content: reply });
           } else if (evt.event === "done") {
@@ -281,6 +334,17 @@ export function ChatView({ conversationId }: { conversationId: string | null }) 
               key={m.id}
               className={`msg msg-${m.role} ${m.status === "error" ? "msg-error" : ""}`}
             >
+              {m.tools && m.tools.length > 0 && (
+                <ul className="tool-trail" aria-label="What Jarvis checked">
+                  {m.tools.map((t) => (
+                    <li key={t.id} className={t.status === "running" ? "is-running" : ""}>
+                      {t.status === "running"
+                        ? (RUNNING_LABELS[t.name] ?? "Working…")
+                        : `✓ ${t.label ?? t.name}`}
+                    </li>
+                  ))}
+                </ul>
+              )}
               <div className="msg-body">
                 {m.role === "assistant" ? (
                   m.content ? (
@@ -294,6 +358,27 @@ export function ChatView({ conversationId }: { conversationId: string | null }) 
                   m.content
                 )}
               </div>
+              {m.proposals?.map((proposal) => (
+                <ProposalCard
+                  key={proposal.id}
+                  proposal={proposal}
+                  canDecide={!!canChat}
+                  onChange={(updated) =>
+                    setMessages((prev) =>
+                      prev.map((msg) =>
+                        msg.id === m.id
+                          ? {
+                              ...msg,
+                              proposals: (msg.proposals ?? []).map((x) =>
+                                x.id === updated.id ? updated : x,
+                              ),
+                            }
+                          : msg,
+                      ),
+                    )
+                  }
+                />
+              ))}
               <div className="msg-meta">
                 {m.role === "assistant" && m.model && <span>{m.model}</span>}
                 {m.content && m.status !== "partial" && canChat && (

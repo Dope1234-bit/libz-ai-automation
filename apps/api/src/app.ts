@@ -17,6 +17,7 @@ import { businessRoutes } from "./routes/business.js";
 import { crmRoutes } from "./routes/crm.js";
 import { memoryRoutes } from "./routes/memories.js";
 import { meRoutes } from "./routes/me.js";
+import { proposalRoutes } from "./routes/proposals.js";
 import { systemRoutes } from "./routes/system.js";
 import { invitationRoutes, workspaceRoutes } from "./routes/workspaces.js";
 
@@ -101,6 +102,7 @@ export function createApp(env: Env, deps: Partial<AppDeps> = {}) {
   v1.route("/", memoryRoutes);
   v1.route("/", crmRoutes);
   v1.route("/", businessRoutes);
+  v1.route("/", proposalRoutes);
   app.route("/v1", v1);
 
   app.notFound((c) => {

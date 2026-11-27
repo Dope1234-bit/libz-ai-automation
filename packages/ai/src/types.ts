@@ -1,12 +1,35 @@
-export type ChatRole = "system" | "user" | "assistant";
+export type ChatRole = "system" | "user" | "assistant" | "tool";
 
-export interface ChatMessage {
-  role: ChatRole;
-  content: string;
+/** A function call requested by the model. */
+export interface ToolCall {
+  id: string;
+  name: string;
+  args: Record<string, unknown>;
+  /** Provider-specific data that must be sent back with the call (e.g. Gemini thought signatures). */
+  meta?: Record<string, string>;
+}
+
+export type ChatMessage =
+  | { role: "system" | "user"; content: string }
+  | { role: "assistant"; content: string; toolCalls?: ToolCall[] }
+  | { role: "tool"; content: string; toolCallId: string; name: string };
+
+/** JSON Schema subset understood by every supported provider. */
+export interface ToolParameters {
+  type: "object";
+  properties: Record<string, Record<string, unknown>>;
+  required?: string[];
+}
+
+export interface ToolDefinition {
+  name: string;
+  description: string;
+  parameters: ToolParameters;
 }
 
 export interface ChatRequest {
   messages: ChatMessage[];
+  tools?: readonly ToolDefinition[];
   maxOutputTokens?: number;
   temperature?: number;
   signal?: AbortSignal;
@@ -20,6 +43,7 @@ export interface TokenUsage {
 export type StreamEvent =
   | { type: "start"; provider: string; model: string }
   | { type: "text"; delta: string }
+  | { type: "tool_call"; call: ToolCall }
   | { type: "finish"; finishReason: string; usage: TokenUsage | null };
 
 /** A chat-capable model provider (one API account). */

@@ -130,6 +130,27 @@ try {
   // Overdue badge on Tasks reflects the real overdue task.
   await rail.getByRole("link", { name: /Tasks/ }).getByText("1").waitFor();
 
+  // Jarvis answers from real records via tools, and proposes changes for confirmation.
+  await rail.getByRole("link", { name: "Chat" }).click();
+  await page.getByLabel("Message", { exact: true }).fill("What's in my pipeline?");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await page.getByText("Your open pipeline is USD 1200.").waitFor({ timeout: 15_000 });
+  await page.getByText("✓ Checked the pipeline").waitFor();
+  await page
+    .getByLabel("Message", { exact: true })
+    .fill("Remind me to call Tendai about the quote");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  const card = page.getByRole("group", { name: "Suggested change" });
+  await card.getByText("call Tendai about the quote").waitFor({ timeout: 15_000 });
+  await card.getByText("Needs your OK").waitFor();
+  await page.getByText("nothing is saved until you do", { exact: false }).waitFor();
+  await shot(page, "desktop-proposal");
+  await card.getByRole("button", { name: "Confirm" }).click();
+  await card.getByText("Saved").waitFor();
+  // The decision survives a reload.
+  await page.reload();
+  await page.getByRole("group", { name: "Suggested change" }).getByText("Saved").waitFor();
+
   // Pipeline: move the deal to Won.
   await rail.getByRole("link", { name: "Pipeline" }).click();
   await page.getByText("1 open deal", { exact: false }).waitFor();
@@ -174,8 +195,9 @@ try {
   // Completing the task clears the overdue badge.
   await rail.getByRole("link", { name: /Tasks/ }).click();
   await page.getByRole("button", { name: "Complete “Send proposal to Moyo”" }).click();
-  await page.getByText("No open tasks.", { exact: false }).waitFor();
   await page.locator(".rail .nav-badge").waitFor({ state: "detached" });
+  // The task Jarvis proposed exists only because it was confirmed.
+  await page.getByText("call Tendai about the quote").waitFor();
 
   // Phone layout.
   const mctx = await browser.newContext({

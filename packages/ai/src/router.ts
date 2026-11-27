@@ -56,7 +56,7 @@ export function createModelRouter(options: ModelRouterOptions): ModelRouter {
         let produced = false;
         try {
           for await (const event of provider.streamChat(ref.model, request)) {
-            if (event.type === "text") produced = true;
+            if (event.type === "text" || event.type === "tool_call") produced = true;
             yield event;
           }
           return;

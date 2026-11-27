@@ -2067,6 +2067,85 @@ select:focus {
   }
 }
 
+/* ----------------------------------------------------------- jarvis tools */
+
+.tool-trail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0 0 0.4rem;
+  padding: 0;
+  list-style: none;
+}
+
+.tool-trail li {
+  padding: 0.15rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+}
+
+.tool-trail li.is-running {
+  border-color: var(--border-strong);
+  color: var(--blue);
+}
+
+.proposal {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.6rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--blue-soft);
+}
+
+.proposal p {
+  margin: 0;
+}
+
+.proposal-confirmed {
+  border-color: rgb(52 211 153 / 35%);
+  background: rgb(52 211 153 / 8%);
+}
+
+.proposal-dismissed {
+  opacity: 0.6;
+  background: transparent;
+}
+
+.proposal-kind {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.proposal-title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.proposal-details,
+.proposal-notes {
+  color: var(--muted);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.proposal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+}
+
 /* --------------------------------------------------------------- responsive */
 
 @media (max-width: 1100px) {

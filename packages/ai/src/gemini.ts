@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Timeouts } from "./http.js";
 import { DEFAULT_TIMEOUTS, fetchWithTimeouts, providerHttpError } from "./http.js";
 import { parseSseData } from "./sse.js";
-import type { ChatRequest, ModelProvider, StreamEvent, TokenUsage } from "./types.js";
+import type { ChatMessage, ChatRequest, ModelProvider, StreamEvent, TokenUsage } from "./types.js";
 import { ProviderError } from "./types.js";
 
 export interface GeminiOptions {
@@ -19,7 +19,26 @@ const chunkSchema = z.object({
     .array(
       z.object({
         content: z
-          .object({ parts: z.array(z.object({ text: z.string().optional() }).loose()).default([]) })
+          .object({
+            parts: z
+              .array(
+                z
+                  .object({
+                    text: z.string().optional(),
+                    thought: z.boolean().optional(),
+                    thoughtSignature: z.string().optional(),
+                    functionCall: z
+                      .object({
+                        id: z.string().optional(),
+                        name: z.string(),
+                        args: z.record(z.string(), z.unknown()).default({}),
+                      })
+                      .optional(),
+                  })
+                  .loose(),
+              )
+              .default([]),
+          })
           .loose()
           .optional(),
         finishReason: z.string().optional(),
@@ -66,12 +85,18 @@ export function createGeminiProvider(options: GeminiOptions = {}): ModelProvider
     id,
     async *streamChat(model: string, request: ChatRequest): AsyncGenerator<StreamEvent> {
       const system = request.messages.filter((m) => m.role === "system").map((m) => m.content);
-      const contents = request.messages
-        .filter((m) => m.role !== "system")
-        .map((m) => ({
-          role: m.role === "assistant" ? "model" : "user",
-          parts: [{ text: m.content }],
-        }));
+      const contents = toGeminiContents(request.messages);
+      const tools = request.tools?.length
+        ? [
+            {
+              functionDeclarations: request.tools.map((t) => ({
+                name: t.name,
+                description: t.description,
+                parameters: t.parameters,
+              })),
+            },
+          ]
+        : undefined;
 
       const url = `${baseURL}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`;
       const response = await fetchWithTimeouts(
@@ -90,6 +115,7 @@ export function createGeminiProvider(options: GeminiOptions = {}): ModelProvider
               ? { systemInstruction: { parts: [{ text: system.join("\n\n") }] } }
               : {}),
             contents,
+            ...(tools ? { tools } : {}),
             generationConfig: {
               ...(request.maxOutputTokens ? { maxOutputTokens: request.maxOutputTokens } : {}),
               ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
@@ -106,6 +132,7 @@ export function createGeminiProvider(options: GeminiOptions = {}): ModelProvider
 
       let finishReason = "stop";
       let usage: TokenUsage | null = null;
+      let calls = 0;
 
       for await (const data of parseSseData(response.body)) {
         let chunk;
@@ -120,7 +147,22 @@ export function createGeminiProvider(options: GeminiOptions = {}): ModelProvider
         if (chunk.promptFeedback?.blockReason) finishReason = "content_filter";
         for (const candidate of chunk.candidates) {
           for (const part of candidate.content?.parts ?? []) {
-            if (part.text) yield { type: "text", delta: part.text };
+            if (part.functionCall) {
+              calls += 1;
+              yield {
+                type: "tool_call",
+                call: {
+                  id: part.functionCall.id ?? `call_${calls}`,
+                  name: part.functionCall.name,
+                  args: part.functionCall.args,
+                  ...(part.thoughtSignature
+                    ? { meta: { thoughtSignature: part.thoughtSignature } }
+                    : {}),
+                },
+              };
+            } else if (part.text && !part.thought) {
+              yield { type: "text", delta: part.text };
+            }
           }
           if (candidate.finishReason) {
             finishReason =
@@ -137,7 +179,49 @@ export function createGeminiProvider(options: GeminiOptions = {}): ModelProvider
         }
       }
 
-      yield { type: "finish", finishReason, usage };
+      yield { type: "finish", finishReason: calls > 0 ? "tool_calls" : finishReason, usage };
     },
   };
+}
+
+type GeminiPart = Record<string, unknown>;
+
+/** Map chat messages to Gemini `contents`, merging consecutive turns of the same role. */
+export function toGeminiContents(messages: readonly ChatMessage[]) {
+  const contents: { role: "user" | "model"; parts: GeminiPart[] }[] = [];
+  for (const m of messages) {
+    if (m.role === "system") continue;
+    const role = m.role === "assistant" ? "model" : "user";
+    const parts: GeminiPart[] = [];
+    if (m.role === "tool") {
+      parts.push({
+        functionResponse: { name: m.name, response: { result: parseJson(m.content) } },
+      });
+    } else {
+      if (m.content) parts.push({ text: m.content });
+      if (m.role === "assistant") {
+        for (const call of m.toolCalls ?? []) {
+          parts.push({
+            functionCall: { name: call.name, args: call.args },
+            ...(call.meta?.thoughtSignature
+              ? { thoughtSignature: call.meta.thoughtSignature }
+              : {}),
+          });
+        }
+      }
+    }
+    if (parts.length === 0) continue;
+    const last = contents.at(-1);
+    if (last && last.role === role) last.parts.push(...parts);
+    else contents.push({ role, parts });
+  }
+  return contents;
+}
+
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
 }

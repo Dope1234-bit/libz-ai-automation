@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { parseSseData } from "./sse.js";
-import type { ChatRequest, ModelProvider, StreamEvent, TokenUsage } from "./types.js";
+import type { ChatMessage, ChatRequest, ModelProvider, StreamEvent, TokenUsage } from "./types.js";
 import { ProviderError } from "./types.js";
 import type { Timeouts } from "./http.js";
 import { DEFAULT_TIMEOUTS, fetchWithTimeouts, providerHttpError } from "./http.js";
@@ -21,7 +21,23 @@ const chunkSchema = z.object({
   choices: z
     .array(
       z.object({
-        delta: z.object({ content: z.string().nullish() }).partial().nullish(),
+        delta: z
+          .object({
+            content: z.string().nullish(),
+            tool_calls: z
+              .array(
+                z.object({
+                  index: z.number().int().nonnegative().default(0),
+                  id: z.string().nullish(),
+                  function: z
+                    .object({ name: z.string().nullish(), arguments: z.string().nullish() })
+                    .nullish(),
+                }),
+              )
+              .nullish(),
+          })
+          .partial()
+          .nullish(),
         finish_reason: z.string().nullish(),
       }),
     )
@@ -61,7 +77,19 @@ export function createOpenAICompatibleProvider(options: OpenAICompatibleOptions)
           },
           body: JSON.stringify({
             model,
-            messages: request.messages,
+            messages: toOpenAIMessages(request.messages),
+            ...(request.tools?.length
+              ? {
+                  tools: request.tools.map((t) => ({
+                    type: "function",
+                    function: {
+                      name: t.name,
+                      description: t.description,
+                      parameters: t.parameters,
+                    },
+                  })),
+                }
+              : {}),
             stream: true,
             stream_options: { include_usage: true },
             ...(request.maxOutputTokens ? { max_tokens: request.maxOutputTokens } : {}),
@@ -78,6 +106,8 @@ export function createOpenAICompatibleProvider(options: OpenAICompatibleOptions)
 
       let finishReason = "stop";
       let usage: TokenUsage | null = null;
+      // Tool calls arrive as fragments keyed by index; assemble them before emitting.
+      const pending = new Map<number, { id: string; name: string; args: string }>();
 
       for await (const data of parseSseData(response.body)) {
         if (data === "[DONE]") break;
@@ -93,6 +123,13 @@ export function createOpenAICompatibleProvider(options: OpenAICompatibleOptions)
         for (const choice of parsed.choices) {
           const delta = choice.delta?.content;
           if (delta) yield { type: "text", delta };
+          for (const fragment of choice.delta?.tool_calls ?? []) {
+            const call = pending.get(fragment.index) ?? { id: "", name: "", args: "" };
+            if (fragment.id) call.id = fragment.id;
+            if (fragment.function?.name) call.name += fragment.function.name;
+            if (fragment.function?.arguments) call.args += fragment.function.arguments;
+            pending.set(fragment.index, call);
+          }
           if (choice.finish_reason) finishReason = choice.finish_reason;
         }
         if (parsed.usage) {
@@ -103,7 +140,42 @@ export function createOpenAICompatibleProvider(options: OpenAICompatibleOptions)
         }
       }
 
-      yield { type: "finish", finishReason, usage };
+      for (const [index, call] of [...pending.entries()].sort(([a], [b]) => a - b)) {
+        let args: Record<string, unknown> = {};
+        try {
+          const parsed: unknown = call.args ? JSON.parse(call.args) : {};
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+            args = parsed as Record<string, unknown>;
+          }
+        } catch {
+          // Malformed arguments: pass an empty object; tool validation reports the problem.
+        }
+        yield {
+          type: "tool_call",
+          call: { id: call.id || `call_${index + 1}`, name: call.name, args },
+        };
+      }
+
+      yield { type: "finish", finishReason: pending.size > 0 ? "tool_calls" : finishReason, usage };
     },
   };
+}
+
+/** Map chat messages to the OpenAI chat-completions message format. */
+export function toOpenAIMessages(messages: readonly ChatMessage[]) {
+  return messages.map((m) => {
+    if (m.role === "tool") return { role: "tool", tool_call_id: m.toolCallId, content: m.content };
+    if (m.role === "assistant" && m.toolCalls?.length) {
+      return {
+        role: "assistant",
+        content: m.content || null,
+        tool_calls: m.toolCalls.map((call) => ({
+          id: call.id,
+          type: "function",
+          function: { name: call.name, arguments: JSON.stringify(call.args) },
+        })),
+      };
+    }
+    return { role: m.role, content: m.content };
+  });
 }

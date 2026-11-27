@@ -480,3 +480,191 @@ describe("prompt helpers", () => {
     expect(fitHistory(history, 1)).toEqual([history[4]]);
   });
 });
+
+describe("tool calling", () => {
+  const tools = [
+    {
+      name: "search_clients",
+      description: "Find clients by name.",
+      parameters: {
+        type: "object" as const,
+        properties: { query: { type: "string" } },
+        required: ["query"],
+      },
+    },
+  ];
+  const history = [
+    { role: "user" as const, content: "Who is Moyo?" },
+    {
+      role: "assistant" as const,
+      content: "",
+      toolCalls: [
+        {
+          id: "c1",
+          name: "search_clients",
+          args: { query: "Moyo" },
+          meta: { thoughtSignature: "sig" },
+        },
+      ],
+    },
+    { role: "tool" as const, toolCallId: "c1", name: "search_clients", content: '{"clients":[]}' },
+  ];
+
+  it("Gemini: sends declarations and history, and parses function calls", async () => {
+    const fetchMock = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) =>
+      sseResponse([
+        {
+          candidates: [
+            {
+              content: {
+                parts: [
+                  { text: "thinking…", thought: true },
+                  {
+                    functionCall: { name: "search_clients", args: { query: "Moyo" } },
+                    thoughtSignature: "abc",
+                  },
+                ],
+              },
+              finishReason: "STOP",
+            },
+          ],
+        },
+      ]),
+    );
+    const gemini = createGeminiProvider({ apiKey: "k", fetch: fetchMock as typeof fetch });
+    const events = await collect(gemini.streamChat("gemini-x", { messages: history, tools }));
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0]![1]!.body)) as {
+      tools: unknown;
+      contents: unknown;
+    };
+    expect(body.tools).toEqual([{ functionDeclarations: tools }]);
+    expect(body.contents).toEqual([
+      { role: "user", parts: [{ text: "Who is Moyo?" }] },
+      {
+        role: "model",
+        parts: [
+          {
+            functionCall: { name: "search_clients", args: { query: "Moyo" } },
+            thoughtSignature: "sig",
+          },
+        ],
+      },
+      {
+        role: "user",
+        parts: [
+          { functionResponse: { name: "search_clients", response: { result: { clients: [] } } } },
+        ],
+      },
+    ]);
+    expect(events.filter((e) => e.type === "text")).toEqual([]); // thoughts are not shown
+    expect(events).toContainEqual({
+      type: "tool_call",
+      call: {
+        id: "call_1",
+        name: "search_clients",
+        args: { query: "Moyo" },
+        meta: { thoughtSignature: "abc" },
+      },
+    });
+    expect(events.at(-1)).toMatchObject({ type: "finish", finishReason: "tool_calls" });
+  });
+
+  it("OpenAI-compatible: assembles streamed call fragments and maps history", async () => {
+    const fetchMock = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) =>
+      sseResponse([
+        {
+          choices: [
+            {
+              delta: {
+                tool_calls: [
+                  { index: 0, id: "t1", function: { name: "search_", arguments: '{"que' } },
+                ],
+              },
+            },
+          ],
+        },
+        {
+          choices: [
+            {
+              delta: {
+                tool_calls: [{ index: 0, function: { name: "clients", arguments: 'ry":"Moyo"}' } }],
+              },
+              finish_reason: "tool_calls",
+            },
+          ],
+        },
+        "[DONE]",
+      ]),
+    );
+    const provider = createOpenAICompatibleProvider({
+      id: "groq",
+      baseURL: "https://example.test/v1",
+      fetch: fetchMock as typeof fetch,
+    });
+    const events = await collect(provider.streamChat("m", { messages: history, tools }));
+    const body = JSON.parse(String(fetchMock.mock.calls[0]![1]!.body)) as {
+      tools: unknown;
+      messages: unknown;
+    };
+    expect(body.tools).toEqual([{ type: "function", function: tools[0] }]);
+    expect(body.messages).toEqual([
+      { role: "user", content: "Who is Moyo?" },
+      {
+        role: "assistant",
+        content: null,
+        tool_calls: [
+          {
+            id: "c1",
+            type: "function",
+            function: { name: "search_clients", arguments: '{"query":"Moyo"}' },
+          },
+        ],
+      },
+      { role: "tool", tool_call_id: "c1", content: '{"clients":[]}' },
+    ]);
+    expect(events).toContainEqual({
+      type: "tool_call",
+      call: { id: "t1", name: "search_clients", args: { query: "Moyo" } },
+    });
+    expect(events.at(-1)).toMatchObject({ type: "finish", finishReason: "tool_calls" });
+  });
+
+  it("router treats a tool call as output (no fallback afterwards)", async () => {
+    const first: ModelProvider = {
+      id: "a",
+      async *streamChat() {
+        yield { type: "tool_call", call: { id: "1", name: "x", args: {} } };
+        throw new ProviderError("a", "boom", { retryable: true });
+      },
+    };
+    const second: ModelProvider = {
+      id: "b",
+      async *streamChat() {
+        yield { type: "text", delta: "should not run" };
+      },
+    };
+    const router = createModelRouter({
+      providers: [first, second],
+      routes: {
+        chat: [
+          { provider: "a", model: "m" },
+          { provider: "b", model: "m" },
+        ],
+      },
+    });
+    await expect(collect(router.stream("chat", { messages: [] }))).rejects.toThrow("boom");
+  });
+
+  it("prompt states tool rules only when tools are available", () => {
+    const base = {
+      workspaceName: "Libz",
+      workspaceType: "business" as const,
+      userDisplayName: null,
+      now: new Date(0),
+    };
+    expect(buildSystemPrompt({ ...base, tools: true })).toContain("never invent clients");
+    expect(buildSystemPrompt({ ...base, tools: true })).toContain("propose_");
+    expect(buildSystemPrompt(base)).toContain("You cannot yet take actions");
+  });
+});
