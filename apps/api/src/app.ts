@@ -1,4 +1,4 @@
-import { buildAiFromEnv } from "@jarvis/ai";
+import { buildAiFromEnv, createModelRouter } from "@jarvis/ai";
 import { AppError, ErrorCode, toErrorBody } from "@jarvis/shared";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
@@ -39,7 +39,7 @@ export function createApp(env: Env, deps: Partial<AppDeps> = {}) {
   const createUserDb =
     deps.createUserDb ?? createUserDbFactory(env.SUPABASE_URL, env.SUPABASE_PUBLISHABLE_KEY);
   const chat: ChatSettings = deps.chat ?? {
-    router: buildAiFromEnv(process.env).router,
+    router: buildRouterOrDisableChat(),
     dailyTokenLimit: env.AI_DAILY_TOKEN_LIMIT,
     maxOutputTokens: env.AI_MAX_OUTPUT_TOKENS,
     historyChars: env.AI_HISTORY_CHARS,
@@ -121,6 +121,25 @@ export function createApp(env: Env, deps: Partial<AppDeps> = {}) {
   });
 
   return app;
+}
+
+/**
+ * A misconfigured AI provider (e.g. a missing key) disables chat (503) instead of
+ * taking the whole API down; the reason is logged without any secret values.
+ */
+function buildRouterOrDisableChat() {
+  try {
+    return buildAiFromEnv(process.env).router;
+  } catch (err) {
+    console.error(
+      JSON.stringify({
+        level: "error",
+        msg: "AI disabled: invalid AI configuration",
+        err: String(err),
+      }),
+    );
+    return createModelRouter({ providers: [], routes: {} });
+  }
 }
 
 function safeCause(cause: unknown): unknown {

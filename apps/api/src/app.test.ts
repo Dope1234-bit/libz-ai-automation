@@ -73,3 +73,17 @@ describe("loadEnv", () => {
     expect(() => loadEnv({})).toThrow(/SUPABASE_URL/);
   });
 });
+
+describe("AI configuration", () => {
+  it("keeps the API up and disables chat when a provider key is missing", async () => {
+    const previous = process.env.AI_PROVIDERS;
+    process.env.AI_PROVIDERS = "groq"; // no GROQ_API_KEY set
+    try {
+      const degraded = createApp(env);
+      expect((await degraded.request("/health")).status).toBe(200);
+    } finally {
+      if (previous === undefined) delete process.env.AI_PROVIDERS;
+      else process.env.AI_PROVIDERS = previous;
+    }
+  });
+});
