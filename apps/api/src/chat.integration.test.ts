@@ -392,15 +392,27 @@ describe("privacy and limits", () => {
     );
   });
 
-  it("rate-limits bursts of chat requests per user", async () => {
+  it("rate-limits bursts of chat requests per user, across app instances", async () => {
+    // Counters are shared (Postgres), so use a fresh user and avoid a window boundary.
+    const carol = await createUser("carol");
+    const second = new Date().getUTCSeconds();
+    if (second > 50) await new Promise((r) => setTimeout(r, (61 - second) * 1000));
     const model = scriptedProvider("primary", "ok", { inputTokens: 1, outputTokens: 1 });
-    const app = createApp(env, { chat: chatSettings([model.provider], { requestsPerMinute: 2 }) });
-    const conversationId = await startConversation(app, alice);
+    const settings = chatSettings([model.provider], { requestsPerMinute: 2 });
+    const apps = [createApp(env, { chat: settings }), createApp(env, { chat: settings })];
+    const conversationId = await startConversation(apps[0]!, carol);
     const statuses: number[] = [];
     for (let i = 0; i < 3; i++) {
-      const res = await call(app, alice, "POST", `/v1/conversations/${conversationId}/messages`, {
-        content: `n${i}`,
-      });
+      // Alternate instances: the limit must hold across them.
+      const res = await call(
+        apps[i % 2]!,
+        carol,
+        "POST",
+        `/v1/conversations/${conversationId}/messages`,
+        {
+          content: `n${i}`,
+        },
+      );
       statuses.push(res.status);
       await res.text();
     }

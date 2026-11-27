@@ -33,7 +33,11 @@ const MAX_TOOL_ROUNDS = 5;
 const estimateTokens = (text: string) => Math.ceil(text.length / 4);
 
 export function conversationRoutes(settings: ChatSettings) {
-  const chatLimiter = rateLimitPerUser({ limit: settings.requestsPerMinute, windowMs: 60_000 });
+  const chatLimiter = rateLimitPerUser({
+    bucket: "chat",
+    limit: settings.requestsPerMinute,
+    windowSeconds: 60,
+  });
 
   return (
     new Hono<AppEnv>()

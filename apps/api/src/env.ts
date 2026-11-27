@@ -30,6 +30,8 @@ const envSchema = z.object({
   /** Characters of conversation history sent to the model per request. */
   AI_HISTORY_CHARS: z.coerce.number().int().min(1000).max(500_000).default(24_000),
   AI_REQUESTS_PER_MINUTE: z.coerce.number().int().min(1).max(600).default(20),
+  /** Create/update/delete requests per user per minute, across all API instances. */
+  WRITE_REQUESTS_PER_MINUTE: z.coerce.number().int().min(1).max(6000).default(120),
 });
 
 export type Env = z.infer<typeof envSchema>;

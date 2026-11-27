@@ -136,6 +136,14 @@ A proposal can be decided once (`400` afterwards), only by the user it belongs
 to (`404` for others), and only with member access at the time of the decision.
 Creation and decision are audited (`jarvis.proposal_*`) without content.
 
+## Rate limits
+
+Per user, shared by every API instance (counters in Postgres): chat messages
+`AI_REQUESTS_PER_MINUTE` (default 20) and create/update/delete requests
+`WRITE_REQUESTS_PER_MINUTE` (default 120). Over the limit → `429 rate_limited`
+with `Retry-After`. If the counter store is unreachable the request is allowed
+and the failure logged; the daily AI token quota still applies.
+
 ## Rules enforced in the database
 
 - Every user gets a **personal workspace** at sign-up; it cannot be deleted or

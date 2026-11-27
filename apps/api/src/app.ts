@@ -10,6 +10,7 @@ import { createSupabaseTokenVerifier, requireAuth } from "./auth.js";
 import type { AppEnv } from "./context.js";
 import type { UserDbFactory } from "./db.js";
 import { createUserDbFactory } from "./db.js";
+import { rateLimitPerUser } from "./rate-limit.js";
 import type { Env } from "./env.js";
 import type { ChatSettings } from "./routes/conversations.js";
 import { conversationRoutes } from "./routes/conversations.js";
@@ -94,6 +95,15 @@ export function createApp(env: Env, deps: Partial<AppDeps> = {}) {
     c.header("Cache-Control", "no-store");
     await next();
   });
+  v1.use(
+    "*",
+    rateLimitPerUser({
+      bucket: "writes",
+      limit: env.WRITE_REQUESTS_PER_MINUTE,
+      windowSeconds: 60,
+      methods: ["POST", "PATCH", "PUT", "DELETE"],
+    }),
+  );
   v1.route("/me", meRoutes);
   v1.route("/workspaces", workspaceRoutes);
   v1.route("/invitations", invitationRoutes);

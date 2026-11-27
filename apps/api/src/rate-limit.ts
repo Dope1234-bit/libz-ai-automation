@@ -1,40 +1,61 @@
 import { AppError, ErrorCode } from "@jarvis/shared";
 import type { MiddlewareHandler } from "hono";
+import { z } from "zod";
 import type { AppEnv } from "./context.js";
 
 export interface RateLimitOptions {
+  /** Counter name, e.g. "chat" or "writes". */
+  bucket: string;
   /** Requests allowed per window, per user. */
   limit: number;
-  windowMs: number;
-  now?: () => number;
+  windowSeconds: number;
+  /** Only count these HTTP methods (default: all). */
+  methods?: readonly string[];
 }
 
+const resultSchema = z.object({
+  allowed: z.boolean(),
+  retry_after_seconds: z.number().int().positive(),
+});
+
 /**
- * Per-user fixed-window rate limiter (in memory). Suitable for a single API
- * instance; Milestone 1.6 moves this to a shared store for horizontal scaling.
- * Must run after `requireAuth`.
+ * Per-user fixed-window rate limit shared by every API instance (counters in
+ * Postgres via `consume_rate_limit`). Must run after `requireAuth` and the db
+ * middleware. If the counter cannot be read the request is allowed and the
+ * failure logged: the daily AI token quota still bounds spend.
  */
 export function rateLimitPerUser(options: RateLimitOptions): MiddlewareHandler<AppEnv> {
-  const now = options.now ?? Date.now;
-  const windows = new Map<string, { start: number; count: number }>();
-
   return async (c, next) => {
-    const key = c.get("user").id;
-    const t = now();
-    let entry = windows.get(key);
-    if (!entry || t - entry.start >= options.windowMs) {
-      entry = { start: t, count: 0 };
-      windows.set(key, entry);
-      // Opportunistic cleanup so the map cannot grow without bound.
-      if (windows.size > 10_000) {
-        for (const [k, v] of windows) if (t - v.start >= options.windowMs) windows.delete(k);
-      }
+    if (options.methods && !options.methods.includes(c.req.method)) return next();
+    // Promise.resolve().then also turns a synchronous throw into a fail-open result.
+    const { data, error } = await Promise.resolve()
+      .then(() =>
+        c.get("db").rpc("consume_rate_limit", {
+          p_bucket: options.bucket,
+          p_limit: options.limit,
+          p_window_seconds: options.windowSeconds,
+        }),
+      )
+      .then(
+        (r: { data: unknown; error: { code?: string } | null }) => r,
+        () => ({ data: null, error: { code: "exception" } }),
+      );
+    const parsed = resultSchema.safeParse(data);
+    if (error || !parsed.success) {
+      console.error(
+        JSON.stringify({
+          level: "error",
+          requestId: c.get("requestId"),
+          msg: "rate limit check failed; allowing request",
+          code: error?.code,
+        }),
+      );
+      return next();
     }
-    entry.count += 1;
-    if (entry.count > options.limit) {
-      c.header("Retry-After", String(Math.ceil((entry.start + options.windowMs - t) / 1000)));
+    if (!parsed.data.allowed) {
+      c.header("Retry-After", String(parsed.data.retry_after_seconds));
       throw new AppError(ErrorCode.RateLimited, "Too many requests. Please slow down.");
     }
-    await next();
+    return next();
   };
 }
