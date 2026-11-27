@@ -67,6 +67,27 @@ export interface AuditEvent {
   created_at: string;
 }
 
+export const MEMORY_CATEGORIES = [
+  "general",
+  "preference",
+  "fact",
+  "goal",
+  "person",
+  "project",
+] as const;
+export type MemoryCategory = (typeof MEMORY_CATEGORIES)[number];
+
+export interface Memory {
+  id: string;
+  workspace_id: string;
+  content: string;
+  category: MemoryCategory;
+  pinned: boolean;
+  source: "manual" | "message";
+  created_at: string;
+  updated_at: string;
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -127,6 +148,20 @@ export const api = {
       `/v1/conversations/${id}`,
     ),
   deleteConversation: (id: string) => request<void>("DELETE", `/v1/conversations/${id}`),
+  memories: (workspaceId: string) =>
+    request<{ memories: Memory[] }>("GET", `/v1/workspaces/${workspaceId}/memories`),
+  createMemory: (
+    workspaceId: string,
+    body: {
+      content: string;
+      category?: MemoryCategory;
+      pinned?: boolean;
+      sourceMessageId?: string;
+    },
+  ) => request<{ memory: Memory }>("POST", `/v1/workspaces/${workspaceId}/memories`, body),
+  updateMemory: (id: string, body: Partial<Pick<Memory, "content" | "category" | "pinned">>) =>
+    request<{ memory: Memory }>("PATCH", `/v1/memories/${id}`, body),
+  deleteMemory: (id: string) => request<void>("DELETE", `/v1/memories/${id}`),
   status: () => request<SystemStatus>("GET", "/v1/system/status"),
   usage: () => request<Usage>("GET", "/v1/me/usage"),
   members: (workspaceId: string) =>

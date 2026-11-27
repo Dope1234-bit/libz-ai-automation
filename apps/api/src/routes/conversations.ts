@@ -122,10 +122,11 @@ export function conversationRoutes(settings: ChatSettings) {
 
         const conversation = await db
           .from("conversations")
-          .select("id, workspaces (name, type)")
+          .select("id, workspace_id, workspaces (name, type)")
           .eq("id", conversationId)
           .maybeSingle<{
             id: string;
+            workspace_id: string;
             workspaces: { name: string; type: "personal" | "business" } | null;
           }>()
           .then(unwrapMaybe);
@@ -136,7 +137,7 @@ export function conversationRoutes(settings: ChatSettings) {
           .rpc("add_user_message", { p_conversation_id: conversationId, p_content: content })
           .then(unwrap);
 
-        const [history, profile] = await Promise.all([
+        const [history, profile, memories] = await Promise.all([
           db
             .from("messages")
             .select("role, content, status")
@@ -151,6 +152,15 @@ export function conversationRoutes(settings: ChatSettings) {
             .eq("id", c.get("user").id)
             .maybeSingle()
             .then(unwrapMaybe),
+          // Only this workspace's memories: personal and business stay separate.
+          db
+            .from("memories")
+            .select("content, category")
+            .eq("workspace_id", conversation.workspace_id)
+            .order("pinned", { ascending: false })
+            .order("updated_at", { ascending: false })
+            .limit(50)
+            .then(unwrap),
         ]);
 
         const messages: ChatMessage[] = [
@@ -161,6 +171,7 @@ export function conversationRoutes(settings: ChatSettings) {
               workspaceType: conversation.workspaces.type,
               userDisplayName: profile?.display_name ?? null,
               now: new Date(),
+              memories,
             }),
           },
           ...fitHistory(

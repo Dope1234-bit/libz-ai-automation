@@ -1158,6 +1158,148 @@ select:focus {
   font-style: italic;
 }
 
+/* -------------------------------------------------------------- pages */
+
+.page {
+  display: grid;
+  gap: 1rem;
+  max-width: 880px;
+  margin: 0 auto;
+}
+
+.page-head h1 {
+  margin: 0.4rem 0 0.4rem;
+  font-size: clamp(1.6rem, 4vw, 2.1rem);
+}
+
+.page-head p {
+  margin: 0;
+}
+
+.page > .panel {
+  padding: 1.25rem;
+}
+
+/* ----------------------------------------------------------------- memory */
+
+.memory-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.memory-form-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.memory-form-row .muted {
+  margin-left: auto;
+  padding-bottom: 0.7rem;
+}
+
+.memory-category {
+  min-width: 160px;
+}
+
+.memory-list {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.memory {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgb(5 8 16 / 55%);
+}
+
+.memory-pinned {
+  border-color: var(--border-strong);
+  box-shadow: inset 3px 0 0 var(--violet);
+}
+
+.memory-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.memory-content {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.memory-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.5rem 0 0;
+}
+
+.memory-meta .tag {
+  margin-left: 0;
+}
+
+.memory-actions {
+  display: flex;
+  gap: 0.15rem;
+}
+
+.memory-actions .icon-btn {
+  width: 36px;
+  min-height: 36px;
+}
+
+.is-on {
+  color: var(--violet);
+}
+
+.msg-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.msg-user .msg-meta {
+  justify-content: flex-end;
+}
+
+.msg-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.35rem;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--faint);
+  font: inherit;
+  cursor: pointer;
+}
+
+.msg-action:hover {
+  background: var(--panel-hover);
+  color: var(--fg);
+}
+
+@media (max-width: 860px) {
+  .memory-form-row {
+    flex-wrap: wrap;
+  }
+
+  .memory-category {
+    flex: 1;
+  }
+}
+
 /* --------------------------------------------------------------- responsive */
 
 @media (max-width: 1100px) {

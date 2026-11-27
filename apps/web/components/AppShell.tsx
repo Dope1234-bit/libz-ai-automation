@@ -8,7 +8,7 @@ import type { SystemStatus } from "@/lib/api";
 import { api } from "@/lib/api";
 import { getSupabase } from "@/lib/supabase/client";
 import { useWorkspace, WorkspaceProvider } from "@/lib/workspace-context";
-import { ChatIcon, CoreIcon, LogoutIcon } from "./icons";
+import { ChatIcon, CoreIcon, LogoutIcon, MemoryIcon } from "./icons";
 import { ModeSwitch } from "./ModeSwitch";
 
 /** Only sections that actually exist are listed; more are added as they ship. */
@@ -19,6 +19,12 @@ const NAV = [
     label: "Chat",
     icon: ChatIcon,
     match: (p: string) => p.startsWith("/app/chat"),
+  },
+  {
+    href: "/app/memory",
+    label: "Memory",
+    icon: MemoryIcon,
+    match: (p: string) => p.startsWith("/app/memory"),
   },
 ];
 

@@ -46,6 +46,10 @@ is not revealed.
 | POST   | `/v1/conversations/:id/messages`               | its owner                           | Send `{ content }`; streams the reply (SSE, below)                                    |
 | GET    | `/v1/system/status`                            | user                                | API/database status, configured AI providers and models (never keys), your last reply |
 | GET    | `/v1/me/usage`                                 | user                                | Your AI tokens used today, the daily limit, and usage by model                        |
+| GET    | `/v1/workspaces/:id/memories`                  | member                              | Your memories in this workspace (pinned first)                                        |
+| POST   | `/v1/workspaces/:id/memories`                  | member+                             | Save `{ content ≤1000, category?, pinned?, sourceMessageId? }`                        |
+| PATCH  | `/v1/memories/:id`                             | its owner                           | Edit `{ content?, category?, pinned? }`                                               |
+| DELETE | `/v1/memories/:id`                             | its owner                           | Forget a memory                                                                       |
 
 ## Streaming chat
 

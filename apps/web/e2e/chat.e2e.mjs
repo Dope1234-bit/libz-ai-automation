@@ -75,7 +75,7 @@ try {
   await page.locator(".msg-assistant strong", { hasText: "Jarvis" }).first().waitFor();
   assert.equal(await page.getByText("**Jarvis**").count(), 0, "markdown is rendered");
 
-  await page.getByLabel("Message").fill("Second message");
+  await page.getByLabel("Message", { exact: true }).fill("Second message");
   await page.getByRole("button", { name: "Send", exact: true }).click();
   await page.getByText('You said: "Second message"').waitFor({ timeout: 15_000 });
   assert.match(page.url(), /\/app\/chat\/[0-9a-f-]{36}$/, "conversation URL");
@@ -86,6 +86,23 @@ try {
   assert.equal(await page.locator(".msg").count(), 4, "history persists across reloads");
   await page.locator(".chat-history").getByRole("link", { name: "First message" }).waitFor();
 
+  // Memory: save a chat message via "Remember", then manage it on the Memory page.
+  await page.getByRole("button", { name: "Remember this message" }).first().click();
+  await page.getByRole("dialog").getByLabel("Note").fill("I prefer meetings after 10am");
+  await page.getByRole("button", { name: "Save memory" }).click();
+  await page.getByText("Saved to memory.").waitFor();
+  await page.getByRole("link", { name: "Memory" }).first().click();
+  await page.waitForURL(/\/app\/memory$/);
+  await page.getByText("I prefer meetings after 10am").waitFor();
+  await page.getByLabel("Remember…").fill("My sister's name is Rudo");
+  await page.getByRole("button", { name: "Save memory" }).click();
+  await page.getByText("My sister's name is Rudo").waitFor();
+  await page.getByRole("button", { name: "Pin memory" }).first().click();
+  await page.getByText("Pinned", { exact: true }).waitFor();
+  page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: "Delete memory" }).last().click();
+  await page.getByText("Saved memories · 1").waitFor();
+
   // Business mode: create the workspace; personal history must not appear there.
   await page.getByRole("link", { name: "Command" }).first().click();
   await page.waitForURL(/\/app$/);
@@ -95,6 +112,10 @@ try {
   await page.getByText("Business mode · Acme Test Business").waitFor();
   await page.getByText("No conversations in this workspace yet.").waitFor();
   await page.getByText("Workspace created").waitFor(); // real audit event
+  // Personal memories are not visible in Business mode.
+  await page.getByRole("link", { name: "Memory" }).first().click();
+  await page.getByText("No memories yet.", { exact: false }).waitFor();
+  await page.getByRole("link", { name: "Command" }).first().click();
 
   // Back to Personal: the personal conversation is there again.
   await page.getByRole("radio", { name: "Personal" }).click();

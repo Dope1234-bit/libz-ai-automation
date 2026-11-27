@@ -6,7 +6,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ConversationSummary, Message } from "@/lib/api";
 import { api, ApiError, sendMessage } from "@/lib/api";
 import { useWorkspace } from "@/lib/workspace-context";
-import { CloseIcon, HistoryIcon, PlusIcon, SendIcon, StopIcon } from "../icons";
+import { BookmarkIcon, CloseIcon, HistoryIcon, PlusIcon, SendIcon, StopIcon } from "../icons";
+import { RememberDialog } from "../memory/RememberDialog";
 import { Markdown } from "../Markdown";
 
 type UiMessage = Pick<Message, "id" | "role" | "content" | "status"> & { model?: string | null };
@@ -22,6 +23,8 @@ export function ChatView({ conversationId }: { conversationId: string | null }) 
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [remembering, setRemembering] = useState<UiMessage | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
   const autoSent = useRef(false);
@@ -245,12 +248,28 @@ export function ChatView({ conversationId }: { conversationId: string | null }) 
                   m.content
                 )}
               </div>
-              {m.role === "assistant" && m.model && <div className="msg-meta">{m.model}</div>}
+              <div className="msg-meta">
+                {m.role === "assistant" && m.model && <span>{m.model}</span>}
+                {m.content && m.status !== "partial" && canChat && (
+                  <button
+                    className="msg-action"
+                    onClick={() => setRemembering(m)}
+                    aria-label="Remember this message"
+                  >
+                    <BookmarkIcon width={14} height={14} /> Remember
+                  </button>
+                )}
+              </div>
             </article>
           ))}
           <div ref={endRef} />
         </div>
 
+        {notice && (
+          <p className="alert alert-info chat-alert" role="status">
+            {notice}
+          </p>
+        )}
         {error && (
           <p className="alert alert-error chat-alert" role="alert">
             {error}
@@ -300,6 +319,25 @@ export function ChatView({ conversationId }: { conversationId: string | null }) 
           )}
         </form>
       </section>
+
+      {remembering && workspace && (
+        <RememberDialog
+          workspaceId={workspace.id}
+          initial={remembering.content}
+          // Only persisted user messages can be cited; optimistic ids are not UUIDs.
+          {...(remembering.role === "user" && UUID.test(remembering.id)
+            ? { sourceMessageId: remembering.id }
+            : {})}
+          onClose={() => setRemembering(null)}
+          onSaved={() => {
+            setRemembering(null);
+            setNotice("Saved to memory. Jarvis will use it in this workspace.");
+            setTimeout(() => setNotice(null), 4000);
+          }}
+        />
+      )}
     </div>
   );
 }
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

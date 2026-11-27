@@ -322,7 +322,12 @@ export function CommandCentre() {
             <span className="tag tag-ok">Online</span>
           </li>
           <li>
-            <span className="dot dot-idle" /> Memory <span className="tag">Next</span>
+            <span className="dot dot-ok" /> Memory (saved notes){" "}
+            <span className="tag tag-ok">Online</span>
+          </li>
+          <li>
+            <span className="dot dot-idle" /> Automatic memory &amp; recall{" "}
+            <span className="tag">Phase 2</span>
           </li>
           <li>
             <span className="dot dot-idle" /> Voice <span className="tag">Next</span>
