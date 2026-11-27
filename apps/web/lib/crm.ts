@@ -237,3 +237,38 @@ export function isOverdue(task: Pick<Task, "due_at" | "status">): boolean {
 export function errorMessage(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback;
 }
+
+export interface Prospect {
+  placeId: string;
+  name: string;
+  address: string | null;
+  phone: string | null;
+  phoneE164: string | null;
+  website: string | null;
+  googleMapsUri: string | null;
+  rating: number | null;
+  ratingCount: number | null;
+  types: string[];
+  businessStatus: string | null;
+  existingClientId: string | null;
+}
+
+export const prospects = {
+  status: (workspaceId: string) =>
+    api.raw<{ configured: boolean; dailyLimit: number }>(
+      "GET",
+      `/v1/workspaces/${workspaceId}/prospects/status`,
+    ),
+  search: (workspaceId: string, body: { what: string; where?: string; pageToken?: string }) =>
+    api.raw<{ query: string; nextPageToken: string | null; results: Prospect[] }>(
+      "POST",
+      `/v1/workspaces/${workspaceId}/prospects/search`,
+      body,
+    ),
+  add: (workspaceId: string, placeId: string, createDeal: boolean) =>
+    api.raw<{ company: { id: string; name: string }; dealId: string | null }>(
+      "POST",
+      `/v1/workspaces/${workspaceId}/prospects/add`,
+      { placeId, createDeal },
+    ),
+};

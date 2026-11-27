@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { AuditEvent, ConversationSummary, Member, SystemStatus, Usage } from "@/lib/api";
 import { api } from "@/lib/api";
+import { useMapsConfigured } from "@/lib/use-maps-status";
 import { useWorkspace } from "@/lib/workspace-context";
 import { ArrowIcon, SendIcon } from "../icons";
 import { TodayPanels } from "../crm/TodayPanels";
@@ -61,6 +62,7 @@ export function CommandCentre() {
   const [members, setMembers] = useState<Member[] | null>(null);
   const [events, setEvents] = useState<AuditEvent[] | null>(null);
   const [command, setCommand] = useState("");
+  const mapsConfigured = useMapsConfigured(workspace?.id, mode === "business");
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -369,6 +371,15 @@ export function CommandCentre() {
             <span className="dot dot-idle" /> Sir Libz reading your CRM{" "}
             <span className="tag">Next</span>
           </li>
+          {mapsConfigured !== null && (
+            <li>
+              <span className={`dot ${mapsConfigured ? "dot-ok" : "dot-idle"}`} /> Find prospects on
+              Google Maps{" "}
+              <span className={`tag ${mapsConfigured ? "tag-ok" : ""}`}>
+                {mapsConfigured ? "Online" : "Needs API key"}
+              </span>
+            </li>
+          )}
           <li>
             <span className="dot dot-idle" /> Calendar, push &amp; email reminders{" "}
             <span className="tag">Not connected</span>

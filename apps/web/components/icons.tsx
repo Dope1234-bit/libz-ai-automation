@@ -175,3 +175,10 @@ export const CheckIcon = (p: IconProps) => (
     <path d="m5 12 5 5 9-10" />
   </Icon>
 );
+
+export const SearchIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="11" cy="11" r="7" />
+    <path d="m20 20-3.5-3.5" />
+  </Icon>
+);

@@ -19,6 +19,9 @@ import { crmRoutes } from "./routes/crm.js";
 import { memoryRoutes } from "./routes/memories.js";
 import { meRoutes } from "./routes/me.js";
 import { proposalRoutes } from "./routes/proposals.js";
+import type { ProspectSettings } from "./routes/prospects.js";
+import { prospectRoutes } from "./routes/prospects.js";
+import { createGooglePlacesClient } from "./integrations/google-places.js";
 import { systemRoutes } from "./routes/system.js";
 import { invitationRoutes, workspaceRoutes } from "./routes/workspaces.js";
 
@@ -30,6 +33,8 @@ export interface AppDeps {
   createUserDb: UserDbFactory;
   /** Defaults to providers configured via AI_* environment variables. */
   chat: ChatSettings;
+  /** Google Maps prospecting; defaults to GOOGLE_MAPS_API_KEY. */
+  prospects: ProspectSettings;
 }
 
 /**
@@ -51,6 +56,13 @@ export function createApp(env: Env, deps: Partial<AppDeps> = {}) {
     maxOutputTokens: env.AI_MAX_OUTPUT_TOKENS,
     historyChars: env.AI_HISTORY_CHARS,
     requestsPerMinute: env.AI_REQUESTS_PER_MINUTE,
+  };
+
+  const prospects: ProspectSettings = deps.prospects ?? {
+    places: env.GOOGLE_MAPS_API_KEY
+      ? createGooglePlacesClient({ apiKey: env.GOOGLE_MAPS_API_KEY })
+      : null,
+    dailyLimit: env.GOOGLE_MAPS_DAILY_LIMIT,
   };
 
   const app = new Hono<AppEnv>();
@@ -113,6 +125,7 @@ export function createApp(env: Env, deps: Partial<AppDeps> = {}) {
   v1.route("/", crmRoutes);
   v1.route("/", businessRoutes);
   v1.route("/", proposalRoutes);
+  v1.route("/", prospectRoutes(prospects));
   app.route("/v1", v1);
 
   app.notFound((c) => {

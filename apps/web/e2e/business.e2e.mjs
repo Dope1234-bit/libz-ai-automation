@@ -192,6 +192,20 @@ try {
   await dialog.getByRole("button", { name: "Done" }).click();
   await page.getByText("2 clients").waitFor();
 
+  // Prospecting on Google Maps (stand-in server): search, add as lead, see it in clients.
+  await rail.getByRole("link", { name: "Prospects" }).click();
+  await page.getByLabel("Looking for").fill("salons");
+  await page.getByRole("button", { name: "Search Google Maps" }).click();
+  await page.getByText("2 results · salons in Harare").waitFor();
+  await page.getByText("Results from Google Maps").waitFor();
+  const salon = page.locator(".prospect", { hasText: "Glow Beauty Salon" });
+  await salon.getByText("+263773004000").waitFor();
+  await shot(page, "desktop-prospects");
+  await salon.getByRole("button", { name: "Add as lead" }).click();
+  await salon.getByRole("link", { name: "In clients" }).click();
+  await page.getByRole("heading", { level: 1, name: "Glow Beauty Salon" }).waitFor();
+  await page.getByText("New lead: Glow Beauty Salon").waitFor();
+
   // Completing the task clears the overdue badge.
   await rail.getByRole("link", { name: /Tasks/ }).click();
   await page.getByRole("button", { name: "Complete “Send proposal to Moyo”" }).click();
@@ -213,6 +227,7 @@ try {
     "/app/tasks",
     "/app/reports",
     "/app/projects",
+    "/app/prospects",
     "/app/more",
   ]) {
     await mp.goto(`${WEB}${path}`);
@@ -239,7 +254,7 @@ try {
   await mp.getByText("WhatsApp booking bot", { exact: true }).waitFor();
   await shot(mp, "phone-pipeline");
   await mp.goto(`${WEB}/app/clients`);
-  await mp.getByText("2 clients").waitFor();
+  await mp.getByText("3 clients").waitFor();
   await mp.getByRole("button", { name: "Add client" }).click();
   await mp.getByRole("dialog").getByLabel("Company name").waitFor();
   await shot(mp, "phone-add-client");

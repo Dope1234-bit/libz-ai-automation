@@ -32,6 +32,10 @@ const envSchema = z.object({
   AI_REQUESTS_PER_MINUTE: z.coerce.number().int().min(1).max(600).default(20),
   /** Create/update/delete requests per user per minute, across all API instances. */
   WRITE_REQUESTS_PER_MINUTE: z.coerce.number().int().min(1).max(6000).default(120),
+  /** Server-side key for Google Places API (New). Unset = prospecting "not connected". */
+  GOOGLE_MAPS_API_KEY: z.string().min(10).optional(),
+  /** Billable Google Maps calls (searches + additions) per user per UTC day. */
+  GOOGLE_MAPS_DAILY_LIMIT: z.coerce.number().int().min(1).max(5000).default(100),
 });
 
 export type Env = z.infer<typeof envSchema>;

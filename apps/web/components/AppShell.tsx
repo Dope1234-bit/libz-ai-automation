@@ -21,6 +21,7 @@ import {
   PipelineIcon,
   ProjectsIcon,
   ReportsIcon,
+  SearchIcon,
   SettingsIcon,
   TasksIcon,
 } from "./icons";
@@ -63,6 +64,14 @@ const NAV: NavItem[] = [
     match: at("/app/clients"),
     modes: ["business"],
     tab: ["business"],
+  },
+  {
+    href: "/app/prospects",
+    label: "Prospects",
+    icon: SearchIcon,
+    match: at("/app/prospects"),
+    modes: ["business"],
+    tab: [],
   },
   {
     href: "/app/pipeline",

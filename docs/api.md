@@ -136,6 +136,25 @@ A proposal can be decided once (`400` afterwards), only by the user it belongs
 to (`404` for others), and only with member access at the time of the decision.
 Creation and decision are audited (`jarvis.proposal_*`) without content.
 
+## Prospects (Google Maps)
+
+Business workspaces, members and above. Needs `GOOGLE_MAPS_API_KEY` (Places API
+(New)) on the server; without it `status.configured` is `false` and the other
+routes return `503`.
+
+| Method | Path                                           | Notes                                                                |
+| ------ | ---------------------------------------------- | -------------------------------------------------------------------- |
+| `GET`  | `/v1/workspaces/:workspaceId/prospects/status` | `{ configured, dailyLimit }`                                         |
+| `POST` | `/v1/workspaces/:workspaceId/prospects/search` | `{ what, where?, pageToken? }` → `{ query, results, nextPageToken }` |
+| `POST` | `/v1/workspaces/:workspaceId/prospects/add`    | `{ placeId, createDeal? }` → `201 { company, dealId }`               |
+
+Search results are shown, not stored, and flag businesses that are already
+clients (same Google place or phone). Adding re-fetches the place from Google on
+the server, saves it as a client with `source: "google_maps"` and its place id
+(adding the same place twice → `409`), and can open a lead deal. Every Google
+call counts toward `GOOGLE_MAPS_DAILY_LIMIT` per user per UTC day (default 100).
+Nothing is ever sent to the businesses found.
+
 ## Rate limits
 
 Per user, shared by every API instance (counters in Postgres): chat messages

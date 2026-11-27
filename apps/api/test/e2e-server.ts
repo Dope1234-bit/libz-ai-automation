@@ -10,6 +10,39 @@ import type { ModelProvider } from "@jarvis/ai";
 import { createModelRouter } from "@jarvis/ai";
 import { createApp } from "../src/app.js";
 import { loadEnv } from "../src/env.js";
+import type { Place, PlacesClient } from "../src/integrations/google-places.js";
+
+/** Deterministic stand-in for Google Maps (no key, no network, no billing). */
+const MAP_PLACES: Place[] = [
+  {
+    placeId: "ChIJe2eSalonHarare",
+    name: "Glow Beauty Salon",
+    address: "5 Samora Machel Ave, Harare, Zimbabwe",
+    phone: "+263 77 300 4000",
+    website: "https://glow.example",
+    googleMapsUri: "https://maps.google.com/?cid=111",
+    rating: 4.7,
+    ratingCount: 58,
+    types: ["beauty_salon"],
+    businessStatus: "OPERATIONAL",
+  },
+  {
+    placeId: "ChIJe2eBarberHarare",
+    name: "Sharp Cuts Barbershop",
+    address: "18 Kwame Nkrumah Ave, Harare, Zimbabwe",
+    phone: null,
+    website: null,
+    googleMapsUri: "https://maps.google.com/?cid=222",
+    rating: 4.2,
+    ratingCount: 9,
+    types: ["barber_shop"],
+    businessStatus: "OPERATIONAL",
+  },
+];
+const fakePlaces: PlacesClient = {
+  search: async () => ({ places: MAP_PLACES, nextPageToken: null }),
+  details: async (id) => MAP_PLACES.find((p) => p.placeId === id) ?? null,
+};
 
 /**
  * Deterministic stand-in model. Mentions of "pipeline" or "remind me to …"
@@ -78,6 +111,7 @@ const scripted: ModelProvider = {
 
 const env = loadEnv();
 const app = createApp(env, {
+  prospects: { places: fakePlaces, dailyLimit: 50 },
   chat: {
     router: createModelRouter({
       providers: [scripted],

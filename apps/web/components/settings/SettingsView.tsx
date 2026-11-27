@@ -11,6 +11,7 @@ import {
   speechInputSupported,
   speechOutputSupported,
 } from "@/lib/voice";
+import { useMapsConfigured } from "@/lib/use-maps-status";
 import { useWorkspace } from "@/lib/workspace-context";
 
 type AssignableRole = "admin" | "member" | "viewer";
@@ -29,6 +30,7 @@ export function SettingsView() {
   const router = useRouter();
   const { me, workspace, refresh } = useWorkspace();
   const [status, setStatus] = useState<SystemStatus | null>(null);
+  const mapsConfigured = useMapsConfigured(workspace?.id, workspace?.type === "business");
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -130,6 +132,17 @@ export function SettingsView() {
             </span>
             <span className="tag tag-ok">Connected</span>
           </li>
+          {mapsConfigured !== null && (
+            <li>
+              <span className={`dot ${mapsConfigured ? "dot-ok" : "dot-idle"}`} />
+              <span>
+                Google Maps <span className="muted small">· Finding prospects</span>
+              </span>
+              <span className={`tag ${mapsConfigured ? "tag-ok" : ""}`}>
+                {mapsConfigured ? "Connected" : "Not connected"}
+              </span>
+            </li>
+          )}
           {INTEGRATIONS.map((i) => (
             <li key={i.name}>
               <span className="dot dot-idle" />
