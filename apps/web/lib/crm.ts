@@ -272,3 +272,97 @@ export const prospects = {
       { placeId, createDeal },
     ),
 };
+
+export type OutreachChannel = "whatsapp" | "email" | "call";
+export type LeadStatus =
+  "to_contact" | "drafted" | "sent" | "replied" | "interested" | "not_interested" | "won";
+
+export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
+  to_contact: "To contact",
+  drafted: "Message ready",
+  sent: "Sent",
+  replied: "Replied",
+  interested: "Interested",
+  not_interested: "Not interested",
+  won: "Won",
+};
+
+export interface Campaign {
+  id: string;
+  workspace_id: string;
+  name: string;
+  target_what: string | null;
+  target_where: string | null;
+  offer: string;
+  channel: OutreachChannel;
+  status: "active" | "paused" | "done";
+  created_at: string;
+  counts?: Partial<Record<LeadStatus, number>>;
+}
+
+export interface CampaignLead {
+  id: string;
+  campaign_id: string;
+  company_id: string;
+  status: LeadStatus;
+  message: string | null;
+  sent_at: string | null;
+  sent_via: OutreachChannel | null;
+  follow_up_at: string | null;
+  companies: {
+    id: string;
+    name: string;
+    phone_e164: string | null;
+    email: string | null;
+    address: string | null;
+    do_not_contact: boolean;
+  } | null;
+}
+
+export const outreach = {
+  campaigns: (workspaceId: string) =>
+    api.raw<{ campaigns: Campaign[] }>("GET", `/v1/workspaces/${workspaceId}/campaigns`),
+  createCampaign: (
+    workspaceId: string,
+    body: {
+      name: string;
+      targetWhat?: string;
+      targetWhere?: string;
+      offer: string;
+      channel: OutreachChannel;
+    },
+  ) => api.raw<{ campaign: Campaign }>("POST", `/v1/workspaces/${workspaceId}/campaigns`, body),
+  campaign: (id: string) =>
+    api.raw<{ campaign: Campaign; leads: CampaignLead[] }>("GET", `/v1/campaigns/${id}`),
+  updateCampaign: (
+    id: string,
+    body: Partial<Pick<Campaign, "status" | "offer" | "name" | "channel">>,
+  ) => api.raw<{ campaign: Campaign }>("PATCH", `/v1/campaigns/${id}`, body),
+  addClients: (id: string, companyIds: string[]) =>
+    api.raw<{ added: number }>("POST", `/v1/campaigns/${id}/leads`, { companyIds }),
+  addFromMaps: (id: string, placeIds: string[]) =>
+    api.raw<{ added: number }>("POST", `/v1/campaigns/${id}/leads/from-maps`, { placeIds }),
+  draft: (leadId: string) =>
+    api.raw<{ lead: CampaignLead }>("POST", `/v1/campaign-leads/${leadId}/draft`),
+  updateLead: (leadId: string, body: { status?: LeadStatus; message?: string }) =>
+    api.raw<{ lead: CampaignLead }>("PATCH", `/v1/campaign-leads/${leadId}`, body),
+  removeLead: (leadId: string) => api.raw<void>("DELETE", `/v1/campaign-leads/${leadId}`),
+  markSent: (leadId: string, via: OutreachChannel) =>
+    api.raw<{ lead: CampaignLead }>("POST", `/v1/campaign-leads/${leadId}/sent`, { via }),
+};
+
+/** Links that open the user's own WhatsApp / email / phone with the message ready. */
+export function sendLinks(lead: CampaignLead) {
+  const message = lead.message ?? "";
+  const phone = lead.companies?.phone_e164?.replace(/\D/g, "") ?? "";
+  const subjectMatch = /^Subject:\s*(.+)\n+/i.exec(message);
+  const subject = subjectMatch?.[1]?.trim() ?? "";
+  const body = subjectMatch ? message.slice(subjectMatch[0].length) : message;
+  return {
+    whatsapp: phone ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}` : null,
+    email: lead.companies?.email
+      ? `mailto:${lead.companies.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+      : null,
+    call: lead.companies?.phone_e164 ? `tel:${lead.companies.phone_e164}` : null,
+  };
+}

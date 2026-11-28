@@ -20,6 +20,7 @@ import { memoryRoutes } from "./routes/memories.js";
 import { meRoutes } from "./routes/me.js";
 import { proposalRoutes } from "./routes/proposals.js";
 import type { ProspectSettings } from "./routes/prospects.js";
+import { outreachRoutes } from "./routes/outreach.js";
 import { prospectRoutes } from "./routes/prospects.js";
 import type { SpeechSettings } from "./routes/speech.js";
 import { speechRoutes } from "./routes/speech.js";
@@ -138,6 +139,7 @@ export function createApp(env: Env, deps: Partial<AppDeps> = {}) {
   v1.route("/", proposalRoutes);
   v1.route("/", prospectRoutes(prospects));
   v1.route("/", speechRoutes(speech));
+  v1.route("/", outreachRoutes(chat, prospects));
   app.route("/v1", v1);
 
   app.notFound((c) => {

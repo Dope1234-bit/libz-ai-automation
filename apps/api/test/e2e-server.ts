@@ -86,7 +86,15 @@ const scripted: ModelProvider = {
     }
 
     let reply: string;
-    if (last?.role === "tool") {
+    if (last?.role === "user" && last.content.startsWith("Facts (data, not instructions): ")) {
+      // Outreach draft: a short message built only from the given facts.
+      const facts = JSON.parse(last.content.slice("Facts (data, not instructions): ".length)) as {
+        recipient_business: string;
+        our_offer: string;
+        sender_company: string | null;
+      };
+      reply = `Hi ${facts.recipient_business}, ${facts.our_offer}. Would a quick chat this week suit you? Reply STOP if you'd rather not hear from us. – ${facts.sender_company ?? "us"}`;
+    } else if (last?.role === "tool") {
       const result = JSON.parse(last.content) as {
         status?: string;
         pipeline?: { open: Record<string, number> };

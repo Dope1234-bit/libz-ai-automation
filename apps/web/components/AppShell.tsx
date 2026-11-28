@@ -22,6 +22,7 @@ import {
   ProjectsIcon,
   ReportsIcon,
   SearchIcon,
+  SendIcon,
   SettingsIcon,
   TasksIcon,
 } from "./icons";
@@ -70,6 +71,14 @@ const NAV: NavItem[] = [
     label: "Prospects",
     icon: SearchIcon,
     match: at("/app/prospects"),
+    modes: ["business"],
+    tab: [],
+  },
+  {
+    href: "/app/outreach",
+    label: "Outreach",
+    icon: SendIcon,
+    match: at("/app/outreach"),
     modes: ["business"],
     tab: [],
   },

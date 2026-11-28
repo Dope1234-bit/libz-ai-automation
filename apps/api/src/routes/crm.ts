@@ -94,7 +94,7 @@ export const ENTITIES: EntityConfig[] = [
     table: "companies",
     label: "Company",
     columns:
-      "id, workspace_id, name, industry, website, phone_e164, email, address, city, country, source, notes, tags, attributes, created_by, created_at, updated_at",
+      "id, workspace_id, name, industry, website, phone_e164, email, address, city, country, source, notes, tags, attributes, do_not_contact, created_by, created_at, updated_at",
     create: z
       .object({
         name: required(200),
@@ -106,6 +106,7 @@ export const ENTITIES: EntityConfig[] = [
         city: optional(text(100)),
         country: optional(text(100)),
         source: z.enum(["manual", "import", "referral", "website", "event", "other"]).optional(),
+        doNotContact: z.boolean().optional(),
         notes: optional(text(5000)),
         tags: tags.optional(),
       })

@@ -155,6 +155,29 @@ the server, saves it as a client with `source: "google_maps"` and its place id
 call counts toward `GOOGLE_MAPS_DAILY_LIMIT` per user per UTC day (default 100).
 Nothing is ever sent to the businesses found.
 
+## Outreach
+
+Campaigns target a kind of business in an area with an offer (business
+workspaces; members write, viewers read).
+
+| Method   | Path                                    | Notes                                                      |
+| -------- | --------------------------------------- | ---------------------------------------------------------- |
+| `GET`    | `/v1/workspaces/:workspaceId/campaigns` | campaigns with lead counts per status                      |
+| `POST`   | `/v1/workspaces/:workspaceId/campaigns` | `{ name, targetWhat?, targetWhere?, offer, channel }`      |
+| `GET`    | `/v1/campaigns/:id`                     | `{ campaign, leads }`                                      |
+| `PATCH`  | `/v1/campaigns/:id`                     | `{ name?, offer?, channel?, status? }`                     |
+| `POST`   | `/v1/campaigns/:id/leads`               | `{ companyIds }`: add existing clients                     |
+| `POST`   | `/v1/campaigns/:id/leads/from-maps`     | `{ placeIds }`: add Google Maps businesses (≤ 20)          |
+| `POST`   | `/v1/campaign-leads/:id/draft`          | Sir Libz writes a personal message (counts AI usage)       |
+| `PATCH`  | `/v1/campaign-leads/:id`                | `{ status?, message? }`                                    |
+| `POST`   | `/v1/campaign-leads/:id/sent`           | `{ via }`: logs an activity and a follow-up task in 3 days |
+| `DELETE` | `/v1/campaign-leads/:id`                | remove from campaign                                       |
+
+Nothing is sent by the server: the user sends each message from their own
+WhatsApp, email or phone and then marks it sent. Drafts use only the facts given
+(business name, kind, area, the offer and the sender) and end with an opt-out
+line. Clients flagged `doNotContact` cannot be drafted for or marked sent.
+
 ## Voice
 
 | Method | Path                | Notes                                                        |

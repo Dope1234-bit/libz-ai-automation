@@ -33,7 +33,7 @@ const addSchema = z
   .strict();
 
 /** Business workspace + member (or higher) access, checked under RLS. */
-async function requireBusinessMember(c: Context<AppEnv>, workspaceId: string) {
+export async function requireBusinessMember(c: Context<AppEnv>, workspaceId: string) {
   const db = c.get("db");
   const [workspace, membership] = await Promise.all([
     db.from("workspaces").select("type").eq("id", workspaceId).maybeSingle().then(unwrapMaybe),
@@ -55,7 +55,7 @@ async function requireBusinessMember(c: Context<AppEnv>, workspaceId: string) {
 }
 
 /** Shared daily cap on billable Google calls. */
-async function consumeQuota(c: Context<AppEnv>, limit: number) {
+export async function consumeQuota(c: Context<AppEnv>, limit: number) {
   const { data, error } = await c.get("db").rpc("consume_rate_limit", {
     p_bucket: "google_places",
     p_limit: limit,
@@ -72,7 +72,7 @@ async function consumeQuota(c: Context<AppEnv>, limit: number) {
   }
 }
 
-function requirePlaces(settings: ProspectSettings): PlacesClient {
+export function requirePlaces(settings: ProspectSettings): PlacesClient {
   if (!settings.places) {
     throw new AppError(
       ErrorCode.Unavailable,
@@ -82,7 +82,7 @@ function requirePlaces(settings: ProspectSettings): PlacesClient {
   return settings.places;
 }
 
-function placesFailure(err: unknown): never {
+export function placesFailure(err: unknown): never {
   if (err instanceof PlacesError) {
     console.error(
       JSON.stringify({ level: "error", msg: "google places failed", status: err.status }),
@@ -95,6 +95,23 @@ function placesFailure(err: unknown): never {
     );
   }
   throw err;
+}
+
+/** A Google Maps place as a new client row (source google_maps, with its place id). */
+export function placeToCompanyRow(workspaceId: string, place: Place) {
+  return {
+    workspace_id: workspaceId,
+    name: place.name.slice(0, 200),
+    phone_e164: place.phone ? normalizePhone(place.phone) : null,
+    website: place.website && place.website.length <= 500 ? place.website : null,
+    address: place.address?.slice(0, 500) ?? null,
+    source: "google_maps",
+    attributes: {
+      google_place_id: place.placeId,
+      ...(place.googleMapsUri ? { google_maps_uri: place.googleMapsUri } : {}),
+      ...(place.types.length ? { google_types: place.types.slice(0, 10) } : {}),
+    },
+  };
 }
 
 export function prospectRoutes(settings: ProspectSettings) {
@@ -179,20 +196,7 @@ export function prospectRoutes(settings: ProspectSettings) {
           throw new AppError(ErrorCode.NotFound, "That place was not found on Google Maps.");
 
         const db = c.get("db");
-        const phone = place.phone ? normalizePhone(place.phone) : null;
-        const row = {
-          workspace_id: workspaceId,
-          name: place.name.slice(0, 200),
-          phone_e164: phone,
-          website: place.website && place.website.length <= 500 ? place.website : null,
-          address: place.address?.slice(0, 500) ?? null,
-          source: "google_maps",
-          attributes: {
-            google_place_id: place.placeId,
-            ...(place.googleMapsUri ? { google_maps_uri: place.googleMapsUri } : {}),
-            ...(place.types.length ? { google_types: place.types.slice(0, 10) } : {}),
-          },
-        };
+        const row = placeToCompanyRow(workspaceId, place);
         const inserted = await db.from("companies").insert(row).select("id, name").single();
         if (inserted.error?.code === "23505") {
           throw new AppError(ErrorCode.Conflict, "This business is already one of your clients.");

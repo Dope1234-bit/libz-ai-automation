@@ -206,6 +206,39 @@ try {
   await page.getByRole("heading", { level: 1, name: "Glow Beauty Salon" }).waitFor();
   await page.getByText("New lead: Glow Beauty Salon").waitFor();
 
+  // Outreach: a campaign for salons in Harare; Sir Libz writes, you send.
+  await rail.getByRole("link", { name: "Outreach" }).click();
+  await page.getByRole("button", { name: "New campaign" }).click();
+  await dialog.getByLabel("Who to reach").fill("salons");
+  await dialog
+    .getByLabel("What you offer them")
+    .fill("we build WhatsApp booking bots so clients can book 24/7");
+  await dialog.getByRole("button", { name: "Create campaign" }).click();
+  await page.getByRole("heading", { level: 1, name: "Salons in Harare" }).waitFor();
+  await page.getByRole("button", { name: "Find on Google Maps" }).click();
+  await dialog.getByRole("button", { name: "Search" }).click();
+  await dialog.getByText("already a client", { exact: false }).waitFor();
+  await dialog.locator(".pick", { hasText: "Glow Beauty Salon" }).getByRole("checkbox").check();
+  await dialog.getByRole("button", { name: "Add 1 to campaign" }).click();
+  const lead = page.locator(".lead", { hasText: "Glow Beauty Salon" });
+  await lead.getByRole("button", { name: "Write message" }).click();
+  const message = lead.getByLabel("Message to Glow Beauty Salon");
+  await message.waitFor();
+  assert.match(
+    await message.inputValue(),
+    /^Hi Glow Beauty Salon, we build WhatsApp booking bots.*Reply STOP/s,
+  );
+  const wa = await lead.getByRole("link", { name: "Open WhatsApp" }).getAttribute("href");
+  assert.ok(
+    wa?.startsWith("https://wa.me/263773004000?text=Hi%20Glow"),
+    "WhatsApp link with the message",
+  );
+  await shot(page, "desktop-outreach");
+  await lead.getByRole("button", { name: "Mark as sent" }).click();
+  await lead.getByLabel("Status of Glow Beauty Salon").waitFor();
+  await lead.getByText("Sent by whatsapp", { exact: false }).waitFor();
+  await page.getByText("Contacted").waitFor();
+
   // Completing the task clears the overdue badge.
   await rail.getByRole("link", { name: /Tasks/ }).click();
   await page.getByRole("button", { name: "Complete “Send proposal to Moyo”" }).click();
@@ -228,6 +261,7 @@ try {
     "/app/reports",
     "/app/projects",
     "/app/prospects",
+    "/app/outreach",
     "/app/more",
   ]) {
     await mp.goto(`${WEB}${path}`);
