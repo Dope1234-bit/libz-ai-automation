@@ -8,6 +8,7 @@ import type { AppEnv } from "../context.js";
 import { unwrap, unwrapMaybe } from "../db.js";
 import { rateLimitPerUser } from "../rate-limit.js";
 import { runTool, serialiseResult, toolsFor } from "../tools/index.js";
+import type { ProspectSettings } from "./prospects.js";
 import { parseBody, uuidParam } from "../validation.js";
 
 export interface ChatSettings {
@@ -32,7 +33,10 @@ const MAX_TOOL_ROUNDS = 5;
 /** Rough token estimate (~4 chars/token) when a provider omits usage data. */
 const estimateTokens = (text: string) => Math.ceil(text.length / 4);
 
-export function conversationRoutes(settings: ChatSettings) {
+export function conversationRoutes(
+  settings: ChatSettings,
+  prospects: ProspectSettings = { places: null, dailyLimit: 0 },
+) {
   const chatLimiter = rateLimitPerUser({
     bucket: "chat",
     limit: settings.requestsPerMinute,
@@ -179,6 +183,9 @@ export function conversationRoutes(settings: ChatSettings) {
         ]);
 
         const workspaceType = conversation.workspaces.type;
+        const maps = prospects.places
+          ? { places: prospects.places, dailyLimit: prospects.dailyLimit }
+          : null;
         const tools = toolsFor(workspaceType);
         const toolCtx = {
           db,
@@ -186,6 +193,7 @@ export function conversationRoutes(settings: ChatSettings) {
           workspaceType,
           conversationId,
           userId: c.get("user").id,
+          maps,
         };
 
         const messages: ChatMessage[] = [
@@ -198,6 +206,7 @@ export function conversationRoutes(settings: ChatSettings) {
               now: new Date(),
               memories,
               tools: tools.length > 0,
+              mapsConnected: maps !== null,
             }),
           },
           ...fitHistory(

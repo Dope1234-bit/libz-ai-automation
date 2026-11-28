@@ -11,6 +11,8 @@ import { createClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "./app.js";
 import { loadEnv } from "./env.js";
+import type { Place, PlacesClient } from "./integrations/google-places.js";
+import type { ProspectSettings } from "./routes/prospects.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? "http://127.0.0.1:54321";
 const PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY ?? "";
@@ -58,7 +60,29 @@ const scripted: ModelProvider = {
   },
 };
 
+const MAP: Place[] = [
+  {
+    placeId: "ChIJtoolsSalon01",
+    name: "Glow Beauty Salon",
+    address: "5 Samora Machel Ave, Harare",
+    phone: "+263 77 300 4000",
+    website: "https://glow.example",
+    googleMapsUri: "https://maps.google.com/?cid=1",
+    rating: 4.7,
+    ratingCount: 58,
+    types: ["beauty_salon"],
+    businessStatus: "OPERATIONAL",
+  },
+];
+const fakePlaces: PlacesClient = {
+  search: async () => ({ places: MAP, nextPageToken: null }),
+  details: async (id) => MAP.find((p) => p.placeId === id) ?? null,
+};
+/** Mutable so tests can connect/disconnect Google Maps (read per request). */
+const maps: ProspectSettings = { places: null, dailyLimit: 50 };
+
 const app = createApp(env, {
+  prospects: maps,
   chat: {
     router: createModelRouter({
       providers: [scripted],
@@ -304,5 +328,89 @@ describe("Sir Libz tools", () => {
     }
     expect(requests).toHaveLength(6);
     expect(requests.at(-1)!.tools).toBeUndefined();
+  });
+});
+
+describe("Google Maps tools in chat", () => {
+  it("say plainly when Google Maps is not connected", async () => {
+    requests.length = 0;
+    await chat(owner, await conversation(owner, ws), "hello");
+    expect(requests[0]!.tools!.map((t) => t.name)).toContain("find_prospects");
+    expect(requests[0]!.messages[0]!.content).toContain("not connected yet");
+    const events = await chat(
+      owner,
+      await conversation(owner, ws),
+      '#call find_prospects {"what":"salons","where":"Harare"}',
+    );
+    expect(text(events)).toContain("Google Maps is not connected yet");
+    expect(events.find((e) => e.event === "tool" && e.data.status === "done")!.data.label).toBe(
+      "Google Maps not connected",
+    );
+  });
+
+  it("are offered in business workspaces only, with location guidance when connected", async () => {
+    maps.places = fakePlaces;
+    try {
+      requests.length = 0;
+      await chat(owner, await conversation(owner, ws), "hello");
+      expect(requests[0]!.tools!.map((t) => t.name)).toEqual(
+        expect.arrayContaining(["find_prospects", "propose_lead"]),
+      );
+      expect(requests[0]!.messages[0]!.content).toContain("ask for one in a single short question");
+      requests.length = 0;
+      await chat(owner, await conversation(owner, owner.personal), "hello");
+      expect(requests[0]!.tools!.map((t) => t.name)).not.toContain("find_prospects");
+    } finally {
+      maps.places = null;
+    }
+  });
+
+  it("finds prospects and adds a lead only after confirmation", async () => {
+    maps.places = fakePlaces;
+    try {
+      const convo = await conversation(owner, ws);
+      const found = await chat(
+        owner,
+        convo,
+        '#call find_prospects {"what":"salons","where":"Harare"}',
+      );
+      expect(text(found)).toContain('"name":"Glow Beauty Salon"');
+      expect(text(found)).toContain('"already_client":false');
+
+      const proposed = await chat(
+        owner,
+        convo,
+        '#call propose_lead {"place_id":"ChIJtoolsSalon01"}',
+      );
+      const proposal = proposed.find((e) => e.event === "proposal")!.data;
+      expect(proposal).toMatchObject({
+        kind: "lead",
+        payload: { name: "Glow Beauty Salon", phone_e164: "+263773004000" },
+      });
+      const before = await call(owner, "GET", `/v1/workspaces/${ws}/companies?q=Glow`);
+      expect(before.body.items).toEqual([]);
+
+      const confirmed = await call(owner, "POST", `/v1/proposals/${proposal.id}/confirm`);
+      const company = (
+        await call(owner, "GET", `/v1/companies/${confirmed.body.proposal.result_id}`)
+      ).body.item;
+      expect(company).toMatchObject({ name: "Glow Beauty Salon", source: "google_maps" });
+      const deals = await call(owner, "GET", `/v1/workspaces/${ws}/deals?company_id=${company.id}`);
+      expect(deals.body.items).toEqual([
+        expect.objectContaining({ title: "New lead: Glow Beauty Salon", stage: "lead" }),
+      ]);
+
+      const again = await chat(owner, convo, '#call propose_lead {"place_id":"ChIJtoolsSalon01"}');
+      expect(again.some((e) => e.event === "proposal")).toBe(false);
+      expect(text(again)).toContain("already a client");
+      const flagged = await chat(
+        owner,
+        convo,
+        '#call find_prospects {"what":"salons","where":"Harare"}',
+      );
+      expect(text(flagged)).toContain('"already_client":true');
+    } finally {
+      maps.places = null;
+    }
   });
 });

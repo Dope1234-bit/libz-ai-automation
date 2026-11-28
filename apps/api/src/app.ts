@@ -119,7 +119,7 @@ export function createApp(env: Env, deps: Partial<AppDeps> = {}) {
   v1.route("/me", meRoutes);
   v1.route("/workspaces", workspaceRoutes);
   v1.route("/invitations", invitationRoutes);
-  v1.route("/", conversationRoutes(chat));
+  v1.route("/", conversationRoutes(chat, prospects));
   v1.route("/", systemRoutes(chat));
   v1.route("/", memoryRoutes);
   v1.route("/", crmRoutes);

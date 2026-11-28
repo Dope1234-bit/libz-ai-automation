@@ -43,7 +43,11 @@ export function ProposalCard({
   }
 
   const details: string[] = [];
-  if (proposal.kind === "task") {
+  if (proposal.kind === "lead") {
+    if (str(p.address)) details.push(String(p.address));
+    if (str(p.phone_e164)) details.push(String(p.phone_e164));
+    details.push("New lead deal · from Google Maps");
+  } else if (proposal.kind === "task") {
     const due = str(p.due_at);
     if (due) {
       details.push(
@@ -58,11 +62,24 @@ export function ProposalCard({
         .join(" · "),
     );
   }
-  if (company) details.push(company);
+  if (company && proposal.kind !== "lead") details.push(company);
 
-  const title = proposal.kind === "task" ? str(p.title) : str(p.summary);
+  const title =
+    proposal.kind === "task"
+      ? str(p.title)
+      : proposal.kind === "lead"
+        ? str(p.name)
+        : str(p.summary);
   const resultHref =
-    proposal.kind === "task" ? "/app/tasks" : companyId ? `/app/clients/${companyId}` : null;
+    proposal.kind === "task"
+      ? "/app/tasks"
+      : proposal.kind === "lead"
+        ? proposal.result_id
+          ? `/app/clients/${proposal.result_id}`
+          : null
+        : companyId
+          ? `/app/clients/${companyId}`
+          : null;
 
   return (
     <div
@@ -71,7 +88,11 @@ export function ProposalCard({
       aria-label="Suggested change"
     >
       <p className="proposal-kind">
-        {proposal.kind === "task" ? "Suggested task" : "Suggested log entry"}
+        {proposal.kind === "task"
+          ? "Suggested task"
+          : proposal.kind === "lead"
+            ? "Suggested lead"
+            : "Suggested log entry"}
         <span className={`tag ${proposal.status === "confirmed" ? "tag-ok" : ""}`}>
           {proposal.status === "pending"
             ? "Needs your OK"

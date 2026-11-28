@@ -101,7 +101,7 @@ export interface Invitation {
 /** A change Sir Libz suggested; nothing is saved until the user confirms. */
 export interface Proposal {
   id: string;
-  kind: "task" | "activity_note";
+  kind: "task" | "activity_note" | "lead";
   summary: string;
   payload: Record<string, unknown>;
   status: "pending" | "confirmed" | "dismissed";

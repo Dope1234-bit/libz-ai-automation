@@ -51,6 +51,8 @@ const RUNNING_LABELS: Record<string, string> = {
   recent_activities: "Reading recent activity…",
   propose_task: "Preparing a task…",
   propose_activity_note: "Preparing a log entry…",
+  find_prospects: "Searching Google Maps…",
+  propose_lead: "Preparing a lead…",
 };
 
 /** Show each saved proposal under the reply that produced it. */
