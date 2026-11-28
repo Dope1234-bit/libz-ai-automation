@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Public, browser-visible settings; placeholders are enough to build.
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Format
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Audit dependencies
+        run: pnpm audit --prod --audit-level high
+
+  database:
+    name: Database & integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Start Supabase (applies migrations)
+        run: pnpm db:start
+
+      - name: Database tests (pgTAP, row-level security)
+        run: pnpm db:test
+
+      - name: Database lint
+        run: pnpm db:lint
+
+      - name: API integration tests
+        run: |
+          # Local-only, well-known development keys printed by the local stack.
+          eval "$(pnpm exec supabase status -o json | jq -r '
+            "export SUPABASE_URL=\(.API_URL)",
+            "export SUPABASE_PUBLISHABLE_KEY=\(.PUBLISHABLE_KEY)",
+            "export SUPABASE_SECRET_KEY=\(.SECRET_KEY)"')"
+          pnpm test:integration
+
+      - name: Browser end-to-end tests
+        run: |
+          eval "$(pnpm exec supabase status -o json | jq -r '
+            "export SUPABASE_URL=\(.API_URL)",
+            "export SUPABASE_PUBLISHABLE_KEY=\(.PUBLISHABLE_KEY)",
+            "export SUPABASE_SECRET_KEY=\(.SECRET_KEY)"')"
+          export NEXT_PUBLIC_SUPABASE_URL=$SUPABASE_URL
+          export NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY
+          export NEXT_PUBLIC_API_URL=http://localhost:4000
+          pnpm --filter @jarvis/web exec playwright install --with-deps chromium
+          pnpm turbo run build --filter=@jarvis/web --filter=@jarvis/api
+          WEB_ORIGINS=http://localhost:3000 pnpm --filter @jarvis/api e2e:server &
+          pnpm --filter @jarvis/web start &
+          for i in $(seq 1 60); do
+            curl -sf localhost:4000/health >/dev/null && curl -sf localhost:3000/api/health >/dev/null && break
+            sleep 1
+          done
+          pnpm --filter @jarvis/web test:e2e
+
+      - name: Stop Supabase
+        if: always()
+        run: pnpm db:stop
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

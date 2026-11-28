@@ -1,0 +1,315 @@
+/**
+ * Browser end-to-end test of Business Mode: creating the business workspace,
+ * clients, contacts, deals and the pipeline, activity logging, tasks with the
+ * overdue badge, CSV import with preview, reports from real aggregates,
+ * personal tasks, and the phone layout — with zero console errors.
+ *
+ * Same prerequisites as chat.e2e.mjs.
+ */
+import assert from "node:assert/strict";
+import { writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { chromium, devices } from "playwright";
+
+const SUPABASE_URL = process.env.SUPABASE_URL ?? "http://127.0.0.1:54321";
+const SECRET_KEY = process.env.SUPABASE_SECRET_KEY;
+const WEB = process.env.WEB_URL ?? "http://localhost:3000";
+const SHOTS = process.env.SCREENSHOT_DIR; // optional: save screenshots here
+assert.ok(SECRET_KEY, "SUPABASE_SECRET_KEY is required");
+
+const email = `biz-${Date.now()}@example.com`;
+const password = `E2e-${crypto.randomUUID()}!aA1`;
+const adminHeaders = {
+  apikey: SECRET_KEY,
+  Authorization: `Bearer ${SECRET_KEY}`,
+  "Content-Type": "application/json",
+};
+const created = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+  method: "POST",
+  headers: adminHeaders,
+  body: JSON.stringify({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { display_name: "Denzel" },
+  }),
+});
+assert.equal(created.status, 200, "create test user");
+const userId = (await created.json()).id;
+
+const browser = await chromium.launch();
+const problems = [];
+const watch = (page) => {
+  page.on("console", (m) => m.type() === "error" && problems.push(m.text()));
+  page.on("pageerror", (e) => problems.push(e.message));
+};
+const shot = async (page, name) => {
+  if (SHOTS) await page.screenshot({ path: join(SHOTS, `${name}.png`), fullPage: false });
+};
+
+try {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 860 } });
+  const page = await ctx.newPage();
+  watch(page);
+
+  await page.goto(`${WEB}/app`);
+  await page.waitForURL(/\/login/);
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill(password);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("heading", { level: 1, name: /Denzel/ }).waitFor();
+
+  // Personal mode: tasks work, CRM sections are not in the navigation.
+  const rail = page.locator(".rail");
+  assert.equal(
+    await rail.getByRole("link", { name: "Clients" }).count(),
+    0,
+    "no Clients in Personal",
+  );
+  await rail.getByRole("link", { name: "Tasks" }).click();
+  await page.getByRole("heading", { level: 1, name: "Tasks" }).waitFor();
+  await page.getByLabel("New task").fill("Renew passport");
+  await page.getByRole("button", { name: "Add task" }).click();
+  await page.getByText("Renew passport").waitFor();
+
+  // Business-only page offers to create the business workspace.
+  await page.goto(`${WEB}/app/clients`);
+  await page.getByRole("button", { name: "Create business workspace" }).click();
+  await page.getByRole("heading", { level: 1, name: "Clients" }).waitFor();
+  await page.getByText("No clients yet.", { exact: false }).waitFor();
+  assert.equal(await page.getByText("Renew passport").count(), 0);
+
+  // Add a client with a local phone number (normalised to E.164).
+  await page.getByRole("button", { name: "Add client" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Company name").fill("Moyo Hardware");
+  await dialog.getByLabel("Industry").fill("Retail");
+  await dialog.getByLabel("Phone").fill("0772 123 456");
+  await dialog.getByRole("button", { name: "Save client" }).click();
+  await page.getByText("1 client").waitFor();
+  await page.getByText("Retail · +263772123456").waitFor();
+  await page.getByRole("link", { name: /Moyo Hardware/ }).click();
+  await page.getByRole("heading", { level: 1, name: "Moyo Hardware" }).waitFor();
+
+  // Contact, deal, task, logged call.
+  await page.getByRole("button", { name: "Contact" }).click();
+  await dialog.getByLabel("Full name").fill("Tendai Moyo");
+  await dialog.getByLabel("Phone").fill("+263 77 212 3456");
+  await dialog.getByRole("button", { name: "Save contact" }).click();
+  await page.getByText("Contacts · 1").waitFor();
+
+  await page.getByRole("button", { name: "Deal" }).click();
+  await dialog.getByLabel("Deal").fill("WhatsApp booking bot");
+  await dialog.getByLabel("Value").fill("1200");
+  await dialog.getByRole("button", { name: "Save deal" }).click();
+  await page.getByText("WhatsApp booking bot").waitFor();
+
+  await page.getByRole("button", { name: "Task" }).click();
+  await dialog.getByLabel("Task").fill("Send proposal to Moyo");
+  const yesterday = new Date(Date.now() - 86_400_000 * 2);
+  const local = new Date(yesterday.getTime() - yesterday.getTimezoneOffset() * 60_000)
+    .toISOString()
+    .slice(0, 16);
+  await dialog.getByLabel("Due").fill(local);
+  await dialog.getByRole("button", { name: "Add task" }).click();
+  await page.getByText("Send proposal to Moyo").waitFor();
+  await page
+    .getByText(/Overdue ·/)
+    .first()
+    .waitFor();
+
+  await page.getByRole("button", { name: "Log call / note" }).click();
+  await dialog.getByLabel("With").selectOption({ label: "Tendai Moyo" });
+  await dialog.getByLabel("Summary").fill("Discussed booking bot; wants a quote by Friday.");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await page.getByText("Discussed booking bot; wants a quote by Friday.").waitFor();
+  await page.getByText("Call · outbound").waitFor();
+  await shot(page, "desktop-client");
+
+  // Overdue badge on Tasks reflects the real overdue task.
+  await rail.getByRole("link", { name: /Tasks/ }).getByText("1").waitFor();
+
+  // Sir Libz answers from real records via tools, and proposes changes for confirmation.
+  await rail.getByRole("link", { name: "Chat" }).click();
+  await page.getByLabel("Message", { exact: true }).fill("What's in my pipeline?");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await page.getByText("Your open pipeline is USD 1200.").waitFor({ timeout: 15_000 });
+  await page.getByText("✓ Checked the pipeline").waitFor();
+  await page
+    .getByLabel("Message", { exact: true })
+    .fill("Remind me to call Tendai about the quote");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  const card = page.getByRole("group", { name: "Suggested change" });
+  await card.getByText("call Tendai about the quote").waitFor({ timeout: 15_000 });
+  await card.getByText("Needs your OK").waitFor();
+  await page.getByText("nothing is saved until you do", { exact: false }).waitFor();
+  await shot(page, "desktop-proposal");
+  await card.getByRole("button", { name: "Confirm" }).click();
+  await card.getByText("Saved").waitFor();
+  // The decision survives a reload.
+  await page.reload();
+  await page.getByRole("group", { name: "Suggested change" }).getByText("Saved").waitFor();
+
+  // Pipeline: move the deal to Won.
+  await rail.getByRole("link", { name: "Pipeline" }).click();
+  await page.getByText("1 open deal", { exact: false }).waitFor();
+  // Wait for the server to save the move (the board updates optimistically first).
+  const saved = page.waitForResponse(
+    (r) => r.request().method() === "PATCH" && /\/v1\/deals\//.test(r.url()) && r.ok(),
+  );
+  await page.getByLabel("Move WhatsApp booking bot to stage").selectOption("won");
+  await saved;
+  await page.getByText("0 open deals", { exact: false }).waitFor();
+  await shot(page, "desktop-pipeline");
+
+  // Reports from real aggregates.
+  await rail.getByRole("link", { name: "Reports" }).click();
+  await page.getByText("1 deal · 0 lost").waitFor();
+  await page.getByText("1 overdue · 0 due today").waitFor();
+  await shot(page, "desktop-reports");
+
+  // Command Centre shows business panels.
+  await rail.getByRole("link", { name: "Command" }).click();
+  await page.locator("#pipeline-title").waitFor();
+  await page.getByText("Send proposal to Moyo").waitFor();
+  await shot(page, "desktop-command");
+
+  // CSV import with preview; duplicates and bad rows are skipped.
+  const csvPath = join(tmpdir(), `contacts-${Date.now()}.csv`);
+  writeFileSync(
+    csvPath,
+    [
+      "Name,Company,Phone,Email",
+      "Chipo Ncube,Ncube Logistics,0712 345 678,chipo@ncube.co.zw",
+      "Tendai Again,,+263772123456,",
+      "Bad Number,,12,",
+    ].join("\n"),
+  );
+  await rail.getByRole("link", { name: "Clients" }).click();
+  await page.getByRole("button", { name: "Import CSV" }).click();
+  await dialog.getByLabel("CSV file").setInputFiles(csvPath);
+  await dialog.getByRole("button", { name: "Preview" }).click();
+  await dialog.getByText("3 rows → 1 new contact, 1 new company", { exact: false }).waitFor();
+  await dialog.getByText("2 row(s) will be skipped").waitFor();
+  await dialog.getByRole("button", { name: "Import 1" }).click();
+  await dialog.getByText("Imported 1 contact and 1 new company.", { exact: false }).waitFor();
+  await dialog.getByRole("button", { name: "Done" }).click();
+  await page.getByText("2 clients").waitFor();
+
+  // Prospecting on Google Maps (stand-in server): search, add as lead, see it in clients.
+  await rail.getByRole("link", { name: "Prospects" }).click();
+  await page.getByLabel("Looking for").fill("salons");
+  await page.getByRole("button", { name: "Search Google Maps" }).click();
+  await page.getByText("2 results · salons in Harare").waitFor();
+  await page.getByText("Results from Google Maps").waitFor();
+  const salon = page.locator(".prospect", { hasText: "Glow Beauty Salon" });
+  await salon.getByText("+263773004000").waitFor();
+  await shot(page, "desktop-prospects");
+  await salon.getByRole("button", { name: "Add as lead" }).click();
+  await salon.getByRole("link", { name: "In clients" }).click();
+  await page.getByRole("heading", { level: 1, name: "Glow Beauty Salon" }).waitFor();
+  await page.getByText("New lead: Glow Beauty Salon").waitFor();
+
+  // Outreach: a campaign for salons in Harare; Sir Libz writes, you send.
+  await rail.getByRole("link", { name: "Outreach" }).click();
+  await page.getByRole("button", { name: "New campaign" }).click();
+  await dialog.getByLabel("Who to reach").fill("salons");
+  await dialog
+    .getByLabel("What you offer them")
+    .fill("we build WhatsApp booking bots so clients can book 24/7");
+  await dialog.getByRole("button", { name: "Create campaign" }).click();
+  await page.getByRole("heading", { level: 1, name: "Salons in Harare" }).waitFor();
+  await page.getByRole("button", { name: "Find on Google Maps" }).click();
+  await dialog.getByRole("button", { name: "Search" }).click();
+  await dialog.getByText("already a client", { exact: false }).waitFor();
+  await dialog.locator(".pick", { hasText: "Glow Beauty Salon" }).getByRole("checkbox").check();
+  await dialog.getByRole("button", { name: "Add 1 to campaign" }).click();
+  const lead = page.locator(".lead", { hasText: "Glow Beauty Salon" });
+  await lead.getByRole("button", { name: "Write message" }).click();
+  const message = lead.getByLabel("Message to Glow Beauty Salon");
+  await message.waitFor();
+  assert.match(
+    await message.inputValue(),
+    /^Hi Glow Beauty Salon, we build WhatsApp booking bots.*Reply STOP/s,
+  );
+  const wa = await lead.getByRole("link", { name: "Open WhatsApp" }).getAttribute("href");
+  assert.ok(
+    wa?.startsWith("https://wa.me/263773004000?text=Hi%20Glow"),
+    "WhatsApp link with the message",
+  );
+  await shot(page, "desktop-outreach");
+  await lead.getByRole("button", { name: "Mark as sent" }).click();
+  await lead.getByLabel("Status of Glow Beauty Salon").waitFor();
+  await lead.getByText("Sent by whatsapp", { exact: false }).waitFor();
+  await page.getByText("Contacted").waitFor();
+
+  // Completing the task clears the overdue badge.
+  await rail.getByRole("link", { name: /Tasks/ }).click();
+  await page.getByRole("button", { name: "Complete “Send proposal to Moyo”" }).click();
+  await page.locator(".rail .nav-badge").waitFor({ state: "detached" });
+  // The task Sir Libz proposed exists only because it was confirmed.
+  await page.getByText("call Tendai about the quote").waitFor();
+
+  // Phone layout.
+  const mctx = await browser.newContext({
+    ...devices["iPhone 13"],
+    storageState: await ctx.storageState(),
+  });
+  const mp = await mctx.newPage();
+  watch(mp);
+  for (const path of [
+    "/app",
+    "/app/clients",
+    "/app/pipeline",
+    "/app/tasks",
+    "/app/reports",
+    "/app/projects",
+    "/app/prospects",
+    "/app/outreach",
+    "/app/more",
+  ]) {
+    await mp.goto(`${WEB}${path}`);
+    await mp.locator(".tabbar").getByRole("link", { name: "More" }).waitFor();
+    await mp.locator("h1").first().waitFor();
+    await mp.waitForTimeout(400);
+    assert.equal(
+      await mp.evaluate(() => document.documentElement.scrollWidth > window.innerWidth),
+      false,
+      `no horizontal scroll on ${path}`,
+    );
+    assert.deepEqual(
+      await mp.evaluate(() =>
+        [...document.querySelectorAll(".panel, .board-col.is-current, .segmented")]
+          .filter((el) => el.getBoundingClientRect().right > window.innerWidth + 1)
+          .map((el) => el.className),
+      ),
+      [],
+      `everything fits on ${path}`,
+    );
+  }
+  await mp.goto(`${WEB}/app/pipeline`);
+  await mp.getByRole("tab", { name: /Won/ }).click();
+  await mp.getByText("WhatsApp booking bot", { exact: true }).waitFor();
+  await shot(mp, "phone-pipeline");
+  await mp.goto(`${WEB}/app/clients`);
+  await mp.getByText("3 clients").waitFor();
+  await mp.getByRole("button", { name: "Add client" }).click();
+  await mp.getByRole("dialog").getByLabel("Company name").waitFor();
+  await shot(mp, "phone-add-client");
+  await mp.getByRole("button", { name: "Close" }).click();
+  await mp.goto(`${WEB}/app/more`);
+  await mp.locator(".more-list").getByRole("link", { name: "Reports" }).click();
+  await mp.getByRole("heading", { level: 1, name: "Reports" }).waitFor();
+  await shot(mp, "phone-reports");
+  await mctx.close();
+
+  assert.deepEqual(problems, [], "no console errors");
+  console.log("business e2e: all checks passed");
+} finally {
+  await browser.close();
+  await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, {
+    method: "DELETE",
+    headers: adminHeaders,
+  });
+}

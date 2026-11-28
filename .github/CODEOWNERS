@@ -1,0 +1,6 @@
+# Default reviewers for every change.
+* @Dope1234-bit
+
+# Security-sensitive areas always require owner review.
+/supabase/ @Dope1234-bit
+/.github/ @Dope1234-bit

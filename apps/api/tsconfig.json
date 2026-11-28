@@ -1,0 +1,4 @@
+{
+  "extends": "@jarvis/tsconfig/node.json",
+  "include": ["src"]
+}

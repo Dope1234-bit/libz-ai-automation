@@ -1,0 +1,34 @@
+{
+  "name": "@jarvis/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "start": "next start --port 3000",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:e2e": "node e2e/chat.e2e.mjs && node e2e/business.e2e.mjs"
+  },
+  "dependencies": {
+    "@jarvis/api": "workspace:*",
+    "@jarvis/shared": "workspace:*",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.119.2",
+    "next": "^16.4.6",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@jarvis/tsconfig": "workspace:*",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.3.3",
+    "@types/react-dom": "^19.3.0",
+    "playwright": "1.63.0",
+    "typescript": "^5.7.0",
+    "vitest": "^5.1.2"
+  }
+}
