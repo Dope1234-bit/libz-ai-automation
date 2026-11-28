@@ -21,6 +21,8 @@ import { meRoutes } from "./routes/me.js";
 import { proposalRoutes } from "./routes/proposals.js";
 import type { ProspectSettings } from "./routes/prospects.js";
 import { prospectRoutes } from "./routes/prospects.js";
+import type { SpeechSettings } from "./routes/speech.js";
+import { speechRoutes } from "./routes/speech.js";
 import { createGooglePlacesClient } from "./integrations/google-places.js";
 import { systemRoutes } from "./routes/system.js";
 import { invitationRoutes, workspaceRoutes } from "./routes/workspaces.js";
@@ -35,6 +37,8 @@ export interface AppDeps {
   chat: ChatSettings;
   /** Google Maps prospecting; defaults to GOOGLE_MAPS_API_KEY. */
   prospects: ProspectSettings;
+  /** Sir Libz's voice; defaults to ELEVENLABS_* settings. */
+  speech: SpeechSettings;
 }
 
 /**
@@ -63,6 +67,13 @@ export function createApp(env: Env, deps: Partial<AppDeps> = {}) {
       ? createGooglePlacesClient({ apiKey: env.GOOGLE_MAPS_API_KEY })
       : null,
     dailyLimit: env.GOOGLE_MAPS_DAILY_LIMIT,
+  };
+
+  const speech: SpeechSettings = deps.speech ?? {
+    apiKey: env.ELEVENLABS_API_KEY ?? null,
+    voiceId: env.ELEVENLABS_VOICE_ID,
+    modelId: env.ELEVENLABS_MODEL_ID,
+    dailyChars: env.SPEECH_DAILY_CHARS,
   };
 
   const app = new Hono<AppEnv>();
@@ -126,6 +137,7 @@ export function createApp(env: Env, deps: Partial<AppDeps> = {}) {
   v1.route("/", businessRoutes);
   v1.route("/", proposalRoutes);
   v1.route("/", prospectRoutes(prospects));
+  v1.route("/", speechRoutes(speech));
   app.route("/v1", v1);
 
   app.notFound((c) => {

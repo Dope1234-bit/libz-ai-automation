@@ -18,6 +18,8 @@ export async function proxy(request: NextRequest) {
     `style-src 'self' 'nonce-${nonce}'`,
     "img-src 'self' blob: data:",
     "font-src 'self'",
+    // Sir Libz's voice is played from in-memory audio (blob:) fetched from our API.
+    "media-src 'self' blob: data:",
     // A relative API URL (same-origin /api) is already covered by 'self'.
     `connect-src 'self'${appConfig.apiUrl.startsWith("http") ? ` ${appConfig.apiUrl}` : ""} ${appConfig.supabaseUrl}`,
     "object-src 'none'",

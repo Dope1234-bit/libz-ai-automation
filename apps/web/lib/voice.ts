@@ -1,13 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { api } from "./api";
 
 /*
  * Voice v1 uses the browser's built-in speech services:
  *  - speech-to-text: the Web Speech API (SpeechRecognition). On Chrome this
  *    sends audio to the browser vendor's speech service; the UI says so.
  *  - text-to-speech: speechSynthesis, which runs on the device.
- * Server-side, premium voices are a Phase 4 upgrade.
+ * Sir Libz's own voice (a deep male ElevenLabs voice) is used when the server
+ * has it connected; otherwise the deepest male voice on the device is chosen.
  */
 
 interface RecognitionResultEvent {
@@ -139,14 +141,139 @@ export function toSpeakable(markdown: string): string {
     .trim();
 }
 
-export function speak(text: string) {
-  if (!speechOutputSupported()) return;
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(toSpeakable(text).slice(0, 4000));
-  utterance.lang = navigator.language || "en-US";
-  window.speechSynthesis.speak(utterance);
+let player: HTMLAudioElement | null = null;
+let playerUrl: string | null = null;
+let serverVoice: Promise<boolean> | null = null;
+
+/** Whether the server speaks with Sir Libz's ElevenLabs voice (checked once). */
+function serverVoiceAvailable(): Promise<boolean> {
+  serverVoice ??= api
+    .speechStatus()
+    .then((s) => s.configured)
+    .catch(() => false);
+  return serverVoice;
+}
+
+/**
+ * Must run inside a tap/click: mobile browsers only let a page play audio later
+ * (after network calls) if playback was first started by a user gesture.
+ */
+export function unlockAudio() {
+  if (typeof window === "undefined") return;
+  player ??= new Audio();
+  player.muted = true;
+  player.src = SILENCE;
+  void player
+    .play()
+    .catch(() => undefined)
+    .finally(() => {
+      if (player) player.muted = false;
+    });
+  if (speechOutputSupported()) window.speechSynthesis.getVoices();
+}
+
+// 0.1 s of silence, used only to unlock audio on mobile.
+const SILENCE =
+  "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=";
+
+/** The deepest-sounding male English voice the device offers, if any. */
+function deviceVoice(): SpeechSynthesisVoice | null {
+  const voices = window.speechSynthesis.getVoices().filter((v) => v.lang.startsWith("en"));
+  const male =
+    /\b(male|man|daniel|david|george|guy|ryan|thomas|aaron|fred|alex|arthur|oliver|james|rishi|reed|eddy|ralph)\b/i;
+  return (
+    voices.find((v) => male.test(v.name) && /google|natural|premium|enhanced/i.test(v.name)) ??
+    voices.find((v) => male.test(v.name)) ??
+    null
+  );
+}
+
+function speakOnDevice(text: string): Promise<void> {
+  return new Promise((resolve) => {
+    if (!speechOutputSupported()) return resolve();
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voice = deviceVoice();
+    if (voice) utterance.voice = voice;
+    utterance.lang = voice?.lang ?? (navigator.language || "en-US");
+    // Lower and slightly slower: closer to Sir Libz's deep, calm voice.
+    utterance.pitch = 0.75;
+    utterance.rate = 0.95;
+    utterance.onend = () => resolve();
+    utterance.onerror = () => resolve();
+    window.speechSynthesis.speak(utterance);
+  });
+}
+
+async function speakWithServer(text: string): Promise<boolean> {
+  try {
+    const audio = await api.speechAudio(text);
+    player ??= new Audio();
+    if (playerUrl) URL.revokeObjectURL(playerUrl);
+    playerUrl = URL.createObjectURL(audio);
+    player.src = playerUrl;
+    await new Promise<void>((resolve, reject) => {
+      player!.onended = () => resolve();
+      player!.onerror = () => reject(new Error("playback failed"));
+      player!.onpause = () => resolve();
+      player!.play().catch(reject);
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Speak a reply in Sir Libz's voice. Resolves when finished (or stopped). */
+export async function speak(text: string): Promise<void> {
+  const spoken = toSpeakable(text).slice(0, 2500);
+  if (!spoken) return;
+  stopSpeaking();
+  if ((await serverVoiceAvailable()) && (await speakWithServer(spoken))) return;
+  await speakOnDevice(spoken);
 }
 
 export function stopSpeaking() {
+  if (player && !player.paused) player.pause();
   if (speechOutputSupported()) window.speechSynthesis.cancel();
+}
+
+/**
+ * Listen for one spoken message (Live mode). Resolves with the final
+ * transcript, or "" if nothing was said. `stop()` ends it early.
+ */
+export function listenOnce(onInterim?: (text: string) => void): {
+  result: Promise<string>;
+  stop: () => void;
+} {
+  const Ctor = recognitionCtor();
+  if (!Ctor)
+    return { result: Promise.reject(new Error(ERRORS["service-not-allowed"])), stop: () => {} };
+  const r = new Ctor();
+  r.lang = navigator.language || "en-US";
+  r.interimResults = true;
+  r.continuous = false;
+  let finalText = "";
+  const result = new Promise<string>((resolve, reject) => {
+    r.onresult = (e) => {
+      let interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const res = e.results[i]!;
+        if (res.isFinal) finalText += res[0].transcript;
+        else interim += res[0].transcript;
+      }
+      onInterim?.((finalText + interim).trim());
+    };
+    r.onerror = (e) => {
+      if (e.error === "no-speech" || e.error === "aborted") return;
+      reject(new Error(ERRORS[e.error] ?? "Voice input failed."));
+    };
+    r.onend = () => resolve(finalText.trim());
+    try {
+      r.start();
+    } catch {
+      resolve("");
+    }
+  });
+  return { result, stop: () => r.stop() };
 }

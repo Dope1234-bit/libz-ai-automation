@@ -210,6 +210,17 @@ export const api = {
   acceptInvitation: (token: string) =>
     request<{ workspaceId: string }>("POST", "/v1/invitations/accept", { token }),
   status: () => request<SystemStatus>("GET", "/v1/system/status"),
+  speechStatus: () => request<{ configured: boolean }>("GET", "/v1/speech/status"),
+  /** Sir Libz's voice for a piece of text (audio/mpeg). */
+  speechAudio: async (text: string): Promise<Blob> => {
+    const res = await fetch(`${config.apiUrl}/v1/speech`, {
+      method: "POST",
+      headers: { ...(await authHeader()), "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    if (!res.ok) throw new ApiError(res.status, "speech_failed", "Voice unavailable.");
+    return res.blob();
+  },
   decideProposal: (id: string, confirm: boolean) =>
     request<{ proposal: Proposal }>(
       "POST",

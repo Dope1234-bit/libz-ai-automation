@@ -182,3 +182,9 @@ export const SearchIcon = (p: IconProps) => (
     <path d="m20 20-3.5-3.5" />
   </Icon>
 );
+
+export const LiveIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M3 12h2M7 8v8M11 5v14M15 8v8M19 11v2M21 12h0" />
+  </Icon>
+);

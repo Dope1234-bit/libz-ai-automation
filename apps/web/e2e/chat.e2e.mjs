@@ -185,6 +185,21 @@ try {
   await page.getByRole("button", { name: "Read replies aloud" }).click();
   await page.getByRole("button", { name: "Stop reading replies aloud" }).waitFor();
 
+  // Live mode: hands-free — what you say is sent, and the reply comes back.
+  await page.getByRole("link", { name: "Chat" }).first().click();
+  await page.getByRole("button", { name: "Talk live with Sir Libz" }).click();
+  await page
+    .getByRole("status")
+    .getByText(/Listening|thinking|speaking/)
+    .first()
+    .waitFor();
+  await page
+    .getByText('You said: "What is on my agenda today"', { exact: false })
+    .first()
+    .waitFor({ timeout: 15_000 });
+  await page.getByRole("button", { name: "End live conversation" }).click();
+  await page.locator(".live-panel").waitFor({ state: "detached" });
+
   // Mobile layout: bottom tabs, history sheet, no horizontal scroll.
   const mobile = await browser.newContext({
     ...devices["iPhone 13"],

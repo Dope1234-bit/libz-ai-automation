@@ -36,6 +36,19 @@ const envSchema = z.object({
   GOOGLE_MAPS_API_KEY: z.string().min(10).optional(),
   /** Billable Google Maps calls (searches + additions) per user per UTC day. */
   GOOGLE_MAPS_DAILY_LIMIT: z.coerce.number().int().min(1).max(5000).default(100),
+  /** ElevenLabs key for Sir Libz's voice. Unset = browsers use their own voice. */
+  ELEVENLABS_API_KEY: z.string().min(10).optional(),
+  /** ElevenLabs voice ("Stray - Deep and Grounded" by default). */
+  ELEVENLABS_VOICE_ID: z
+    .string()
+    .regex(/^[A-Za-z0-9]{10,40}$/)
+    .default("DT7zBOa8kCzTWHNN60AC"),
+  ELEVENLABS_MODEL_ID: z
+    .string()
+    .regex(/^[a-z0-9_]{3,60}$/)
+    .default("eleven_flash_v2_5"),
+  /** Characters of speech per user per UTC day (ElevenLabs bills per character). */
+  SPEECH_DAILY_CHARS: z.coerce.number().int().min(100).max(1_000_000).default(20_000),
 });
 
 export type Env = z.infer<typeof envSchema>;

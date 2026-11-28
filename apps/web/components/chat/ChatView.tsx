@@ -7,16 +7,20 @@ import type { ConversationSummary, Message, Proposal } from "@/lib/api";
 import { api, ApiError, sendMessage } from "@/lib/api";
 import { useWorkspace } from "@/lib/workspace-context";
 import {
+  listenOnce,
   readAloudPreference,
   setReadAloudPreference,
   speak,
+  speechInputSupported,
   speechOutputSupported,
   stopSpeaking,
+  unlockAudio,
 } from "@/lib/voice";
 import {
   BookmarkIcon,
   CloseIcon,
   HistoryIcon,
+  LiveIcon,
   PlusIcon,
   SendIcon,
   SpeakerIcon,
@@ -143,9 +147,9 @@ export function ChatView({ conversationId }: { conversationId: string | null }) 
   }, [messages]);
 
   const send = useCallback(
-    async (text?: string) => {
+    async (text?: string, opts: { live?: boolean } = {}): Promise<string> => {
       const content = (text ?? draft).trim();
-      if (!content || streaming || !workspace) return;
+      if (!content || streaming || !workspace) return "";
       setError(null);
       setDraft("");
       setStreaming(true);
@@ -154,6 +158,7 @@ export function ChatView({ conversationId }: { conversationId: string | null }) 
       const controller = new AbortController();
       abortRef.current = controller;
       const replyId = `pending-${Date.now()}`;
+      let reply = "";
 
       try {
         let id = activeId;
@@ -172,7 +177,6 @@ export function ChatView({ conversationId }: { conversationId: string | null }) 
         const update = (patch: Partial<UiMessage>) =>
           setMessages((prev) => prev.map((m) => (m.id === replyId ? { ...m, ...patch } : m)));
 
-        let reply = "";
         for await (const evt of sendMessage(id, content, controller.signal)) {
           if (evt.event === "model") update({ model: evt.data.model });
           else if (evt.event === "tool") {
@@ -195,7 +199,8 @@ export function ChatView({ conversationId }: { conversationId: string | null }) 
             reply += evt.data.text;
             update({ content: reply });
           } else if (evt.event === "done") {
-            if (readAloudRef.current && reply) speak(reply);
+            // Live mode speaks the reply itself (and then listens again).
+            if (!opts.live && readAloudRef.current && reply) void speak(reply);
             update({
               status: evt.data.status === "partial" ? "partial" : "complete",
               id: evt.data.messageId ?? replyId,
@@ -207,16 +212,79 @@ export function ChatView({ conversationId }: { conversationId: string | null }) 
         }
         void refreshConversations(workspace.id);
       } catch (err) {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted) return "";
         setMessages((prev) => prev.filter((m) => !(m.id === replyId && m.content === "")));
         handleError(err);
+        return "";
       } finally {
         setStreaming(false);
         abortRef.current = null;
       }
+      return reply;
     },
     [activeId, draft, streaming, workspace, refreshConversations, handleError],
   );
+
+  // ------------------------------------------------------------- Live mode
+  // Hands-free conversation: listen → send → Sir Libz speaks → listen again.
+  const sendRef = useRef(send);
+  sendRef.current = send;
+  const [live, setLive] = useState<null | "listening" | "thinking" | "speaking">(null);
+  const [heard, setHeard] = useState("");
+  const [canLive, setCanLive] = useState(false);
+  const liveRef = useRef(false);
+  const listenRef = useRef<{ stop: () => void } | null>(null);
+
+  useEffect(() => {
+    setCanLive(speechInputSupported());
+    return () => {
+      liveRef.current = false;
+      listenRef.current?.stop();
+    };
+  }, []);
+
+  async function startLive() {
+    unlockAudio(); // must happen inside the tap
+    setError(null);
+    liveRef.current = true;
+    let silentTurns = 0;
+    while (liveRef.current) {
+      setLive("listening");
+      setHeard("");
+      let said: string;
+      try {
+        const session = listenOnce(setHeard);
+        listenRef.current = session;
+        said = await session.result;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Voice input failed.");
+        break;
+      } finally {
+        listenRef.current = null;
+      }
+      if (!liveRef.current) break;
+      if (!said) {
+        if (++silentTurns >= 3) break;
+        continue;
+      }
+      silentTurns = 0;
+      setLive("thinking");
+      const reply = await sendRef.current(said, { live: true });
+      if (!liveRef.current || !reply) break;
+      setLive("speaking");
+      await speak(reply);
+    }
+    liveRef.current = false;
+    setLive(null);
+    setHeard("");
+  }
+
+  function stopLive() {
+    liveRef.current = false;
+    listenRef.current?.stop();
+    stopSpeaking();
+    setLive(null);
+  }
 
   // A prompt handed over from the Command Centre (?q=...) is sent once.
   useEffect(() => {
@@ -292,6 +360,17 @@ export function ChatView({ conversationId }: { conversationId: string | null }) 
             <HistoryIcon />
           </button>
           <h1 className="chat-title">{title}</h1>
+          {canLive && canChat && (
+            <button
+              className={`btn btn-ghost live-btn ${live ? "is-on" : ""}`}
+              onClick={() => (live ? stopLive() : void startLive())}
+              aria-pressed={!!live}
+              aria-label={live ? "End live conversation" : "Talk live with Sir Libz"}
+              title={live ? "End live conversation" : "Talk live with Sir Libz"}
+            >
+              <LiveIcon /> <span>{live ? "End" : "Live"}</span>
+            </button>
+          )}
           {canSpeak && (
             <button
               className={`btn btn-ghost icon-btn ${readAloud ? "is-on" : ""}`}
@@ -397,6 +476,25 @@ export function ChatView({ conversationId }: { conversationId: string | null }) 
           ))}
           <div ref={endRef} />
         </div>
+
+        {live && (
+          <div className="live-panel" role="status" aria-live="polite">
+            <div className={`orb orb-sm live-orb live-${live}`} aria-hidden="true" />
+            <div className="live-text">
+              <p className="live-state">
+                {live === "listening"
+                  ? "Listening…"
+                  : live === "thinking"
+                    ? "Sir Libz is thinking…"
+                    : "Sir Libz is speaking…"}
+              </p>
+              {heard && live === "listening" && <p className="muted small">“{heard}”</p>}
+            </div>
+            <button className="btn btn-secondary btn-sm" onClick={stopLive}>
+              End
+            </button>
+          </div>
+        )}
 
         {notice && (
           <p className="alert alert-info chat-alert" role="status">
