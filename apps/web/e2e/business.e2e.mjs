@@ -154,7 +154,12 @@ try {
   // Pipeline: move the deal to Won.
   await rail.getByRole("link", { name: "Pipeline" }).click();
   await page.getByText("1 open deal", { exact: false }).waitFor();
+  // Wait for the server to save the move (the board updates optimistically first).
+  const saved = page.waitForResponse(
+    (r) => r.request().method() === "PATCH" && /\/v1\/deals\//.test(r.url()) && r.ok(),
+  );
   await page.getByLabel("Move WhatsApp booking bot to stage").selectOption("won");
+  await saved;
   await page.getByText("0 open deals", { exact: false }).waitFor();
   await shot(page, "desktop-pipeline");
 
